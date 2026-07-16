@@ -565,6 +565,7 @@ async function startSearchRun() {
   await logEvent("search_started", `Searching ${active.platform || "selected platforms"} for ${active.name}. CV matching threshold and daily limits will be applied.`);
   await loadData();
   render();
+  await runOnlineSearch(active);
 }
 
 async function stopSearchRun() {
@@ -671,6 +672,92 @@ function parseSearchKeywords(value) {
     exclusions: read("exclude:"),
     mode: modeText.includes("prepare") ? "auto" : "review"
   };
+}
+
+async function runOnlineSearch(search) {
+  try {
+    const parsed = parseSearchKeywords(search.keywords || "");
+    state.runProgress = 18;
+    state.runStage = "Calling JobPilot search service";
+    renderDashboard();
+
+    const response = await fetch("/api/jobpilot-search.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        keywords: parsed.keywords || search.name,
+        platforms: search.platform || "LinkedIn, Indeed, Wuzzuf",
+        location: search.location || state.profile?.location || "Remote",
+        exclusions: parsed.exclusions,
+        limit: parsed.dailyLimit || 10
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "Search service failed");
+
+    state.runProgress = 54;
+    state.runStage = "Scoring jobs against CV";
+    renderDashboard();
+
+    const minScore = Number.parseInt(parsed.minScore || "70", 10);
+    const existingUrls = new Set(state.jobs.map((job) => job.url).filter(Boolean));
+    const matched = (payload.jobs || [])
+      .map((job) => ({ ...job, match_score: scoreJob(job, state.profile?.resume_summary || "", parsed.keywords) }))
+      .filter((job) => job.match_score >= minScore && !existingUrls.has(job.url));
+
+    state.runProgress = 78;
+    state.runStage = `Saving ${matched.length} matched job(s)`;
+    renderDashboard();
+
+    if (matched.length) {
+      const rows = matched.map((job) => ({
+        user_id: state.user.id,
+        saved_search_id: search.id,
+        title: job.title || "Untitled role",
+        company: job.company || "Unknown",
+        platform: job.platform || "Imported",
+        status: "Saved",
+        location: job.location || "",
+        url: job.url || "",
+        description: job.description || "",
+        match_score: job.match_score,
+        ai_summary: `Matched from ${search.name} using CV keywords.`
+      }));
+      const { error } = await supabaseClient.from("jobs").insert(rows);
+      if (error) throw error;
+    }
+
+    state.runActive = false;
+    stopProgressTimer("Search completed", 100);
+    await logEvent("search_completed", `Found ${payload.jobs?.length || 0} job(s), saved ${matched.length} CV-matched job(s).`);
+    await loadData();
+    render();
+  } catch (error) {
+    state.runActive = false;
+    stopProgressTimer("Search failed", state.runProgress || 0);
+    await logEvent("search_failed", error.message || "Search failed");
+    await loadData();
+    render();
+  }
+}
+
+function scoreJob(job, resumeText, keywordText) {
+  const haystack = `${job.title || ""} ${job.company || ""} ${job.description || ""}`.toLowerCase();
+  const resumeTerms = extractTerms(`${resumeText} ${keywordText}`);
+  if (!resumeTerms.length) return 0;
+  const matched = resumeTerms.filter((term) => haystack.includes(term)).length;
+  return Math.min(100, Math.round((matched / Math.min(resumeTerms.length, 30)) * 100));
+}
+
+function extractTerms(text) {
+  const stop = new Set(["and", "the", "for", "with", "from", "that", "this", "your", "you", "are", "was", "were", "have", "has", "will", "job", "role"]);
+  return [...new Set(String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9+#.\s-]/g, " ")
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 3 && !stop.has(term)))]
+    .slice(0, 80);
 }
 
 async function clearActivity() {
