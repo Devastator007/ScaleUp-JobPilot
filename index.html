@@ -26,15 +26,15 @@
         </div>
         <nav class="nav">
           <button class="nav-item active" data-view="dashboard">Dashboard</button>
+          <button class="nav-item" data-view="searches">Search Setup</button>
+          <button class="nav-item" data-view="jobs">Opportunities</button>
           <button class="nav-item" data-view="pipeline">Pipeline</button>
-          <button class="nav-item" data-view="jobs">Jobs</button>
-          <button class="nav-item" data-view="searches">Saved Searches</button>
           <button class="nav-item" data-view="profile">Profile</button>
-          <button class="nav-item" data-view="billing">Billing</button>
+          <button class="nav-item" data-view="billing">Account</button>
         </nav>
         <div class="sidebar-card">
-          <div class="muted small">Plan</div>
-          <div id="plan-label" class="plan-label">Trial</div>
+          <div class="muted small">Access</div>
+          <div id="plan-label" class="plan-label">JobPilot</div>
           <div id="license-label" class="muted small">Loading account...</div>
         </div>
       </aside>
@@ -46,14 +46,14 @@
             <p id="view-subtitle">Your job search operating system.</p>
           </div>
           <div class="topbar-actions">
-            <button id="new-job-btn" class="button secondary">Add Job</button>
+            <button id="new-job-btn" class="button secondary">Start search</button>
             <button id="sign-out-btn" class="button ghost">Sign out</button>
           </div>
         </header>
 
         <section id="setup-warning" class="alert hidden">
-          <strong>Supabase is not configured.</strong>
-          Add your Supabase URL and anon/publishable key in <code>config.js</code>.
+          <strong>JobPilot is being configured.</strong>
+          Please contact ScaleUp Tech support if this message remains visible.
         </section>
 
         <section id="auth-view" class="auth-card hidden">
@@ -91,7 +91,7 @@
 
     <dialog id="job-dialog" class="dialog">
       <form id="job-form" method="dialog">
-        <h2 id="job-dialog-title">Add Job</h2>
+        <h2 id="job-dialog-title">Review opportunity</h2>
         <input type="hidden" id="job-id" />
         <div class="form-grid">
           <label>Title<input id="job-title" required /></label>
@@ -113,7 +113,7 @@
         <label>Notes<textarea id="job-notes" rows="4"></textarea></label>
         <div class="dialog-actions">
           <button type="button" class="button ghost" id="cancel-job-btn">Cancel</button>
-          <button type="submit" class="button primary">Save job</button>
+          <button type="submit" class="button primary">Save review</button>
         </div>
       </form>
     </dialog>

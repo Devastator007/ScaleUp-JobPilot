@@ -281,7 +281,31 @@ textarea {
 }
 
 .form-message.success {
-  color: var(--ok);
+  color: var(--good);
+}
+
+.panel-actions {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0 10px;
+}
+
+.notice-box {
+  margin-top: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  padding: 14px;
+}
+
+.notice-box p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .metrics-grid {

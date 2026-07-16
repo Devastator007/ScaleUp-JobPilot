@@ -13,7 +13,8 @@ const state = {
   searches: [],
   events: [],
   view: "dashboard",
-  authMode: "signin"
+  authMode: "signin",
+  runActive: false
 };
 
 const els = {
@@ -83,7 +84,7 @@ function bindEvents() {
   });
   els.forgotPasswordBtn.addEventListener("click", () => setAuthMode("reset"));
   els.signOutBtn.addEventListener("click", signOut);
-  els.newJobBtn.addEventListener("click", () => openJobDialog());
+  els.newJobBtn.addEventListener("click", startSearchRun);
   els.cancelJobBtn.addEventListener("click", () => els.jobDialog.close());
   els.jobForm.addEventListener("submit", saveJob);
 }
@@ -238,8 +239,8 @@ async function ensureProfile() {
     full_name: "",
     target_title: "",
     location: "",
-    plan: "trial",
-    license_status: "trial"
+    plan: "JobPilot Access",
+    license_status: "active"
   };
   const { data: created, error: createError } = await supabaseClient
     .from("profiles")
@@ -268,8 +269,8 @@ async function loadData() {
   state.subscription = subscription.data || null;
   state.events = events.data || [];
 
-  els.planLabel.textContent = state.profile?.plan || "trial";
-  els.licenseLabel.textContent = state.subscription?.status || state.profile?.license_status || "trial";
+  els.planLabel.textContent = displayPlan();
+  els.licenseLabel.textContent = displayStatus();
 }
 
 function setView(view) {
@@ -281,12 +282,12 @@ function setView(view) {
   document.getElementById(`${view}-view`).classList.remove("hidden");
 
   const meta = {
-    dashboard: ["Dashboard", "Your job search operating system."],
-    pipeline: ["Pipeline", "Move opportunities from saved to offer."],
-    jobs: ["Jobs", "All tracked jobs and application notes."],
-    searches: ["Saved Searches", "Reusable searches for your target roles."],
+    dashboard: ["Dashboard", "Search, score, review, and apply with a guided workflow."],
+    pipeline: ["Pipeline", "Track applications from discovered to offer."],
+    jobs: ["Opportunities", "Jobs discovered or reviewed by your JobPilot workflow."],
+    searches: ["Search Setup", "Choose platforms, keywords, filters, and daily limits."],
     profile: ["Profile", "Your candidate profile and application defaults."],
-    billing: ["Billing", "Plan, license, and upgrade readiness."]
+    billing: ["Account", "Your account access and product setup status."]
   };
   els.viewTitle.textContent = meta[view][0];
   els.viewSubtitle.textContent = meta[view][1];
@@ -300,6 +301,7 @@ function render() {
   renderSearches();
   renderProfile();
   renderBilling();
+  bindDynamicActions();
 }
 
 function renderDashboard() {
@@ -318,13 +320,18 @@ function renderDashboard() {
     </div>
     <div class="grid-2">
       <section class="panel">
-        <h2>Search health</h2>
+        <h2>JobPilot workflow</h2>
         <table class="table">
           <tr><th>Metric</th><th>Value</th></tr>
-          <tr><td>Saved searches</td><td>${state.searches.length}</td></tr>
-          <tr><td>Average fit score</td><td>${avgScore ? `${avgScore}%` : "No scores yet"}</td></tr>
+          <tr><td>Search setups</td><td>${state.searches.length}</td></tr>
+          <tr><td>Average CV fit score</td><td>${avgScore ? `${avgScore}%` : "No scores yet"}</td></tr>
           <tr><td>Best platform</td><td>${bestPlatform()}</td></tr>
         </table>
+        <div class="panel-actions">
+          <button class="button primary" data-start-run>Start search</button>
+          <button class="button secondary" data-stop-run ${state.runActive ? "" : "disabled"}>Stop</button>
+        </div>
+        <p class="muted small">The hosted app prepares and tracks your search workflow. Browser-based platform automation runs from the Windows desktop app where normal browser sessions and resume files are available.</p>
       </section>
       <section class="panel">
         <h2>Recent activity</h2>
@@ -362,7 +369,7 @@ function renderJobs() {
               <thead><tr><th>Role</th><th>Platform</th><th>Status</th><th>Score</th><th></th></tr></thead>
               <tbody>${state.jobs.map(jobRow).join("")}</tbody>
             </table>`
-          : empty("Add your first job to start tracking.")
+          : empty("No opportunities yet. Create a search setup, then start a search run.")
       }
     </section>
   `;
@@ -372,21 +379,21 @@ function renderJobs() {
 function renderSearches() {
   document.getElementById("searches-view").innerHTML = `
     <section class="panel">
-      <h2>Create saved search</h2>
-      <form id="search-form" class="form-grid">
-        <label>Name<input id="search-name" placeholder="Customer Success Manager - Cairo" required /></label>
-        <label>Platform<input id="search-platform" placeholder="LinkedIn" /></label>
-        <label>Keywords<input id="search-keywords" placeholder="customer success, account manager" /></label>
-        <label>Location<input id="search-location" placeholder="Remote, Cairo" /></label>
-        <button class="button primary" type="submit">Save search</button>
+        <h2>Create search setup</h2>
+        <form id="search-form" class="form-grid">
+          <label>Name<input id="search-name" placeholder="Customer Success Manager - Cairo" required /></label>
+        <label>Platforms<input id="search-platform" placeholder="LinkedIn, Indeed, Wuzzuf, Bayt" /></label>
+          <label>Keywords<input id="search-keywords" placeholder="customer success, account manager" /></label>
+          <label>Location<input id="search-location" placeholder="Remote, Cairo" /></label>
+        <button class="button primary" type="submit">Save setup</button>
       </form>
     </section>
     <section class="panel" style="margin-top:16px">
-      <h2>Saved searches</h2>
+      <h2>Search setups</h2>
       ${
         state.searches.length
           ? `<table class="table"><tbody>${state.searches.map(searchRow).join("")}</tbody></table>`
-          : empty("No saved searches yet.")
+          : empty("No search setup yet.")
       }
     </section>
   `;
@@ -414,19 +421,18 @@ function renderProfile() {
 }
 
 function renderBilling() {
-  const payment = cfg.STRIPE_PAYMENT_LINK
-    ? `<a class="button primary" href="${escapeAttr(cfg.STRIPE_PAYMENT_LINK)}" target="_blank" rel="noreferrer">Upgrade plan</a>`
-    : `<p class="muted">Add your Stripe Payment Link in <code>config.js</code> when you are ready to sell paid plans.</p>`;
-
   document.getElementById("billing-view").innerHTML = `
     <section class="panel">
-      <h2>License and billing</h2>
+      <h2>Account access</h2>
       <table class="table">
         <tr><th>Account</th><td>${escapeHtml(state.user.email || "")}</td></tr>
-        <tr><th>Plan</th><td>${escapeHtml(state.profile?.plan || "trial")}</td></tr>
-        <tr><th>Status</th><td>${escapeHtml(state.subscription?.status || state.profile?.license_status || "trial")}</td></tr>
+        <tr><th>Product</th><td>${escapeHtml(displayPlan())}</td></tr>
+        <tr><th>Status</th><td>${escapeHtml(displayStatus())}</td></tr>
       </table>
-      <div style="margin-top:16px">${payment}</div>
+      <div class="notice-box">
+        <strong>Windows automation required for platform applications.</strong>
+        <p>Use the desktop app to sign in to LinkedIn and other platforms, run the normal browser automation, apply Stop safely, and keep resume files on your computer. This cloud workspace keeps account, profile, search setup, and opportunity tracking online.</p>
+      </div>
     </section>
   `;
 }
@@ -499,6 +505,12 @@ function bestPlatform() {
 }
 
 function bindDynamicActions() {
+  document.querySelectorAll("[data-start-run]").forEach((button) => {
+    button.addEventListener("click", startSearchRun);
+  });
+  document.querySelectorAll("[data-stop-run]").forEach((button) => {
+    button.addEventListener("click", stopSearchRun);
+  });
   document.querySelectorAll("[data-edit-job]").forEach((button) => {
     button.addEventListener("click", () => {
       const job = state.jobs.find((item) => item.id === button.dataset.editJob);
@@ -508,7 +520,8 @@ function bindDynamicActions() {
 }
 
 function openJobDialog(job = null) {
-  els.jobDialogTitle.textContent = job ? "Edit Job" : "Add Job";
+  if (!job) return;
+  els.jobDialogTitle.textContent = "Review opportunity";
   document.getElementById("job-id").value = job?.id || "";
   document.getElementById("job-title").value = job?.title || "";
   document.getElementById("job-company").value = job?.company || "";
@@ -519,6 +532,36 @@ function openJobDialog(job = null) {
   document.getElementById("job-url").value = job?.url || "";
   document.getElementById("job-notes").value = job?.notes || "";
   els.jobDialog.showModal();
+}
+
+async function startSearchRun() {
+  if (!state.searches.length) {
+    state.view = "searches";
+    setView("searches");
+    return;
+  }
+  state.runActive = true;
+  await logEvent("search_started", `Prepared ${state.searches.length} search setup(s) for JobPilot desktop automation.`);
+  await loadData();
+  render();
+}
+
+async function stopSearchRun() {
+  if (!state.runActive) return;
+  state.runActive = false;
+  await logEvent("search_stopped", "Stop requested for the current JobPilot workflow.");
+  await loadData();
+  render();
+}
+
+function displayPlan() {
+  const raw = state.subscription?.plan || state.profile?.plan || "JobPilot Access";
+  return raw.toLowerCase() === "trial" ? "JobPilot Access" : raw;
+}
+
+function displayStatus() {
+  const raw = state.subscription?.status || state.profile?.license_status || "active";
+  return raw.toLowerCase() === "trial" ? "active" : raw;
 }
 
 async function saveJob(event) {
