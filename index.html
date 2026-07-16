@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ScaleUp JobPilot</title>
+    <meta
+      name="description"
+      content="AI job search workspace for saved searches, applications, pipeline tracking, and analytics."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div id="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">S</div>
+          <div>
+            <div class="brand-title">ScaleUp JobPilot</div>
+            <div class="brand-subtitle">Cloud job search workspace</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-view="dashboard">Dashboard</button>
+          <button class="nav-item" data-view="pipeline">Pipeline</button>
+          <button class="nav-item" data-view="jobs">Jobs</button>
+          <button class="nav-item" data-view="searches">Saved Searches</button>
+          <button class="nav-item" data-view="profile">Profile</button>
+          <button class="nav-item" data-view="billing">Billing</button>
+        </nav>
+        <div class="sidebar-card">
+          <div class="muted small">Plan</div>
+          <div id="plan-label" class="plan-label">Trial</div>
+          <div id="license-label" class="muted small">Loading account...</div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="view-title">Dashboard</h1>
+            <p id="view-subtitle">Your job search operating system.</p>
+          </div>
+          <div class="topbar-actions">
+            <button id="new-job-btn" class="button secondary">Add Job</button>
+            <button id="sign-out-btn" class="button ghost">Sign out</button>
+          </div>
+        </header>
+
+        <section id="setup-warning" class="alert hidden">
+          <strong>Supabase is not configured.</strong>
+          Add your Supabase URL and anon/publishable key in <code>config.js</code>.
+        </section>
+
+        <section id="auth-view" class="auth-card hidden">
+          <div>
+            <p class="eyebrow">ScaleUp JobPilot</p>
+            <h2>Sellable cloud workspace for serious job seekers</h2>
+            <p>
+              Create an account to manage saved searches, applications, AI-fit notes,
+              follow-ups, and analytics in a Supabase-backed app.
+            </p>
+          </div>
+          <form id="auth-form" class="auth-form">
+            <label>Email<input id="auth-email" type="email" required /></label>
+            <label>Password<input id="auth-password" type="password" minlength="6" required /></label>
+            <div class="auth-actions">
+              <button class="button primary" type="submit" data-auth-mode="signin">Sign in</button>
+              <button class="button secondary" type="button" id="signup-btn">Create account</button>
+            </div>
+            <p id="auth-message" class="form-message"></p>
+          </form>
+        </section>
+
+        <section id="app-view" class="hidden">
+          <div id="dashboard-view" class="view"></div>
+          <div id="pipeline-view" class="view hidden"></div>
+          <div id="jobs-view" class="view hidden"></div>
+          <div id="searches-view" class="view hidden"></div>
+          <div id="profile-view" class="view hidden"></div>
+          <div id="billing-view" class="view hidden"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="job-dialog" class="dialog">
+      <form id="job-form" method="dialog">
+        <h2 id="job-dialog-title">Add Job</h2>
+        <input type="hidden" id="job-id" />
+        <div class="form-grid">
+          <label>Title<input id="job-title" required /></label>
+          <label>Company<input id="job-company" required /></label>
+          <label>Platform<input id="job-platform" placeholder="LinkedIn" /></label>
+          <label>Status
+            <select id="job-status">
+              <option>Saved</option>
+              <option>Applied</option>
+              <option>Interviewing</option>
+              <option>Offer</option>
+              <option>Rejected</option>
+            </select>
+          </label>
+          <label>Location<input id="job-location" /></label>
+          <label>Match score<input id="job-score" type="number" min="0" max="100" /></label>
+        </div>
+        <label>Job URL<input id="job-url" type="url" /></label>
+        <label>Notes<textarea id="job-notes" rows="4"></textarea></label>
+        <div class="dialog-actions">
+          <button type="button" class="button ghost" id="cancel-job-btn">Cancel</button>
+          <button type="submit" class="button primary">Save job</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

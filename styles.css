@@ -1,0 +1,442 @@
+:root {
+  --bg: #0f172a;
+  --panel: #111827;
+  --panel-2: #172033;
+  --card: #ffffff;
+  --muted-card: #f8fafc;
+  --line: #dbe3ef;
+  --text: #132033;
+  --muted: #64748b;
+  --brand: #2563eb;
+  --brand-dark: #1d4ed8;
+  --good: #059669;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --purple: #7c3aed;
+  --shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #eef3f8;
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+#app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+}
+
+.sidebar {
+  background: var(--bg);
+  color: white;
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--brand);
+  font-weight: 800;
+}
+
+.brand-title {
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.brand-subtitle,
+.muted {
+  color: #94a3b8;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.nav {
+  display: grid;
+  gap: 4px;
+}
+
+.nav-item {
+  border: 0;
+  width: 100%;
+  text-align: left;
+  color: #cbd5e1;
+  background: transparent;
+  padding: 12px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  color: #fff;
+  background: #1e293b;
+}
+
+.sidebar-card {
+  margin-top: auto;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 14px;
+  background: #111c30;
+}
+
+.plan-label {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 4px 0;
+}
+
+.main {
+  min-width: 0;
+  padding: 28px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 4px;
+  font-size: 28px;
+}
+
+.topbar p {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.topbar-actions,
+.auth-actions,
+.dialog-actions,
+.row-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.button {
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button.primary {
+  color: white;
+  background: var(--brand);
+}
+
+.button.primary:hover {
+  background: var(--brand-dark);
+}
+
+.button.secondary {
+  color: var(--text);
+  background: white;
+  border: 1px solid var(--line);
+}
+
+.button.ghost {
+  color: var(--muted);
+  background: transparent;
+}
+
+.button.danger {
+  color: white;
+  background: var(--bad);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.alert {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.auth-card {
+  min-height: calc(100vh - 160px);
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 420px;
+  align-items: center;
+  gap: 36px;
+}
+
+.auth-card h2 {
+  font-size: 44px;
+  line-height: 1.05;
+  max-width: 720px;
+}
+
+.auth-card p {
+  color: var(--muted);
+  font-size: 17px;
+  max-width: 640px;
+}
+
+.eyebrow {
+  color: var(--brand) !important;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  font-weight: 800;
+  font-size: 12px !important;
+}
+
+.auth-form,
+.panel,
+.metric-card,
+.dialog form {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 11px;
+  color: var(--text);
+  background: white;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.form-message {
+  min-height: 20px;
+  margin: 0;
+  color: var(--bad);
+  font-size: 13px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  padding: 18px;
+}
+
+.metric-card .value {
+  font-size: 32px;
+  font-weight: 850;
+  margin: 4px 0;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.panel {
+  padding: 18px;
+}
+
+.panel h2,
+.panel h3 {
+  margin-bottom: 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.badge.Applied,
+.badge.Offer {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge.Interviewing {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.Rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+}
+
+.lane {
+  background: #e8eef5;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 420px;
+}
+
+.lane-title {
+  font-size: 13px;
+  font-weight: 850;
+  margin-bottom: 10px;
+}
+
+.job-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.job-card h3 {
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.job-card p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dialog {
+  border: 0;
+  border-radius: 10px;
+  padding: 0;
+  width: min(720px, calc(100vw - 40px));
+}
+
+.dialog::backdrop {
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.dialog form {
+  padding: 22px;
+  display: grid;
+  gap: 14px;
+}
+
+.empty {
+  color: var(--muted);
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--muted-card);
+}
+
+@media (max-width: 940px) {
+  #app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .auth-card,
+  .grid-2,
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
