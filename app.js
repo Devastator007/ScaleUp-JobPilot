@@ -14,7 +14,11 @@ const state = {
   events: [],
   view: "dashboard",
   authMode: "signin",
-  runActive: false
+  runActive: false,
+  runProgress: 0,
+  runStage: "Ready",
+  runTimer: null,
+  editingSearchId: null
 };
 
 const els = {
@@ -327,6 +331,7 @@ function renderDashboard() {
           <tr><td>Average CV fit score</td><td>${avgScore ? `${avgScore}%` : "No scores yet"}</td></tr>
           <tr><td>Best platform</td><td>${bestPlatform()}</td></tr>
         </table>
+        ${progressPanel()}
         <div class="panel-actions">
           <button class="button primary" data-start-run>Start search</button>
           <button class="button secondary" data-stop-run ${state.runActive ? "" : "disabled"}>Stop</button>
@@ -334,7 +339,10 @@ function renderDashboard() {
         <p class="muted small">JobPilot uses your CV and search entries to decide which roles should be reviewed or applied to. Platform sign-in and browser automation follow the same workflow as the Windows app.</p>
       </section>
       <section class="panel">
-        <h2>Recent activity</h2>
+        <div class="panel-title-row">
+          <h2>Recent activity</h2>
+          <button class="button ghost" data-clear-activity ${state.events.length ? "" : "disabled"}>Clear activity</button>
+        </div>
         ${state.events.length ? state.events.map(eventRow).join("") : empty("No activity yet.")}
       </section>
     </div>
@@ -380,6 +388,7 @@ function renderSearches() {
     <section class="panel">
         <h2>Create search/apply setup</h2>
         <form id="search-form" class="form-grid">
+          <input id="search-id" type="hidden" />
           <label>Target role<input id="search-name" placeholder="Customer Success Manager" required /></label>
           <label>Platforms<input id="search-platform" placeholder="LinkedIn, Indeed, Wuzzuf, Bayt" /></label>
           <label>Must-have keywords<input id="search-keywords" placeholder="customer success, SaaS, account management" /></label>
@@ -393,7 +402,10 @@ function renderSearches() {
               <option value="auto">Prepare applications for jobs above threshold</option>
             </select>
           </label>
-        <button class="button primary" type="submit">Save setup</button>
+        <div class="form-actions">
+          <button class="button primary" type="submit" id="search-save-btn">Save setup</button>
+          <button class="button secondary hidden" type="button" id="search-cancel-edit-btn">Cancel edit</button>
+        </div>
       </form>
     </section>
     <section class="panel" style="margin-top:16px">
@@ -406,6 +418,8 @@ function renderSearches() {
     </section>
   `;
   document.getElementById("search-form").addEventListener("submit", saveSearch);
+  document.getElementById("search-cancel-edit-btn").addEventListener("click", resetSearchForm);
+  if (state.editingSearchId) populateSearchForm(state.searches.find((item) => item.id === state.editingSearchId));
 }
 
 function renderProfile() {
@@ -480,6 +494,7 @@ function searchRow(search) {
       <td><strong>${escapeHtml(search.name)}</strong><br><span class="muted small">${escapeHtml(search.keywords || "")}</span></td>
       <td>${escapeHtml(search.location || "")}</td>
       <td>${escapeHtml(search.platform || "Any")}</td>
+      <td><button class="button secondary" data-edit-search="${search.id}">Edit</button></td>
     </tr>
   `;
 }
@@ -519,6 +534,12 @@ function bindDynamicActions() {
   document.querySelectorAll("[data-stop-run]").forEach((button) => {
     button.addEventListener("click", stopSearchRun);
   });
+  document.querySelectorAll("[data-edit-search]").forEach((button) => {
+    button.addEventListener("click", () => editSearchSetup(button.dataset.editSearch));
+  });
+  document.querySelectorAll("[data-clear-activity]").forEach((button) => {
+    button.addEventListener("click", clearActivity);
+  });
 }
 
 async function startSearchRun() {
@@ -537,6 +558,9 @@ async function startSearchRun() {
     return;
   }
   state.runActive = true;
+  state.runProgress = 0;
+  state.runStage = "Preparing CV and search filters";
+  startProgressTimer();
   const active = state.searches[0];
   await logEvent("search_started", `Searching ${active.platform || "selected platforms"} for ${active.name}. CV matching threshold and daily limits will be applied.`);
   await loadData();
@@ -546,6 +570,7 @@ async function startSearchRun() {
 async function stopSearchRun() {
   if (!state.runActive) return;
   state.runActive = false;
+  stopProgressTimer("Stopped", state.runProgress);
   await logEvent("search_stopped", "Stop requested for the current JobPilot search/apply workflow.");
   await loadData();
   render();
@@ -563,6 +588,7 @@ function displayStatus() {
 
 async function saveSearch(event) {
   event.preventDefault();
+  const id = document.getElementById("search-id").value;
   const keywords = document.getElementById("search-keywords").value.trim();
   const minScore = document.getElementById("search-min-score").value.trim() || "70";
   const dailyLimit = document.getElementById("search-daily-limit").value.trim() || "10";
@@ -584,14 +610,79 @@ async function saveSearch(event) {
     location: document.getElementById("search-location").value.trim(),
     frequency: "manual"
   };
-  const { error } = await supabaseClient.from("saved_searches").insert(payload);
+  const result = id
+    ? await supabaseClient.from("saved_searches").update(payload).eq("id", id)
+    : await supabaseClient.from("saved_searches").insert(payload);
+  const { error } = result;
   if (error) {
     alert(error.message);
     return;
   }
-  await logEvent("search_created", `Saved search/apply setup for ${payload.name}.`);
+  await logEvent(id ? "search_updated" : "search_created", `${id ? "Updated" : "Saved"} search/apply setup for ${payload.name}.`);
+  state.editingSearchId = null;
   await loadData();
   renderSearches();
+  renderDashboard();
+}
+
+function editSearchSetup(id) {
+  state.editingSearchId = id;
+  state.view = "searches";
+  setView("searches");
+}
+
+function populateSearchForm(search) {
+  if (!search) return;
+  document.getElementById("search-id").value = search.id;
+  document.getElementById("search-name").value = search.name || "";
+  document.getElementById("search-platform").value = search.platform || "";
+  document.getElementById("search-location").value = search.location || "";
+  const parsed = parseSearchKeywords(search.keywords || "");
+  document.getElementById("search-keywords").value = parsed.keywords;
+  document.getElementById("search-min-score").value = parsed.minScore;
+  document.getElementById("search-daily-limit").value = parsed.dailyLimit;
+  document.getElementById("search-exclusions").value = parsed.exclusions;
+  document.getElementById("search-mode").value = parsed.mode;
+  document.getElementById("search-save-btn").textContent = "Update setup";
+  document.getElementById("search-cancel-edit-btn").classList.remove("hidden");
+}
+
+function resetSearchForm() {
+  state.editingSearchId = null;
+  document.getElementById("search-form").reset();
+  document.getElementById("search-id").value = "";
+  document.getElementById("search-min-score").value = "70";
+  document.getElementById("search-daily-limit").value = "10";
+  document.getElementById("search-save-btn").textContent = "Save setup";
+  document.getElementById("search-cancel-edit-btn").classList.add("hidden");
+}
+
+function parseSearchKeywords(value) {
+  const lines = String(value).split(/\r?\n/);
+  const read = (prefix, fallback = "") => {
+    const line = lines.find((item) => item.toLowerCase().startsWith(prefix));
+    return line ? line.slice(prefix.length).trim() : fallback;
+  };
+  const modeText = read("mode:", "review matches before applying");
+  return {
+    keywords: read("keywords:"),
+    minScore: read("minimum cv match:", "70").replace("%", ""),
+    dailyLimit: read("daily apply limit:", "10"),
+    exclusions: read("exclude:"),
+    mode: modeText.includes("prepare") ? "auto" : "review"
+  };
+}
+
+async function clearActivity() {
+  const { error } = await supabaseClient
+    .from("activity_events")
+    .delete()
+    .eq("user_id", state.user.id);
+  if (error) {
+    alert(error.message);
+    return;
+  }
+  state.events = [];
   renderDashboard();
 }
 
@@ -645,6 +736,43 @@ function readinessPanel() {
     ["Run", state.events.some((event) => event.event_type === "search_started"), "Run search"]
   ];
   return `<section class="panel readiness-panel"><h2>Setup checklist</h2><div class="checklist">${steps.map(([label, done, text]) => `<div class="check-item ${done ? "done" : ""}"><strong>${label}</strong><span>${text}</span></div>`).join("")}</div></section>`;
+}
+
+function progressPanel() {
+  return `<div class="progress-wrap">
+    <div class="progress-head"><strong>${state.runActive ? "Search running" : "Search progress"}</strong><span>${state.runProgress}%</span></div>
+    <div class="progress-track"><div class="progress-fill" style="width:${state.runProgress}%"></div></div>
+    <p class="muted small">${escapeHtml(state.runStage)}</p>
+  </div>`;
+}
+
+function startProgressTimer() {
+  clearInterval(state.runTimer);
+  const stages = [
+    [12, "Reading CV and profile"],
+    [24, "Preparing platform search filters"],
+    [38, "Checking search/apply setup"],
+    [52, "Scoring candidate fit rules"],
+    [68, "Waiting for scraping worker connection"],
+    [82, "Ready to import matched jobs"],
+    [95, "Run is still active"]
+  ];
+  state.runTimer = setInterval(() => {
+    if (!state.runActive) return;
+    const next = stages.find(([pct]) => pct > state.runProgress);
+    if (next) {
+      state.runProgress = next[0];
+      state.runStage = next[1];
+    }
+    renderDashboard();
+  }, 1200);
+}
+
+function stopProgressTimer(stage, progress = state.runProgress) {
+  clearInterval(state.runTimer);
+  state.runTimer = null;
+  state.runProgress = progress;
+  state.runStage = stage;
 }
 
 function titleCase(value) {
