@@ -308,6 +308,38 @@ textarea {
   opacity: 0.55;
 }
 
+.readiness-panel {
+  margin-bottom: 16px;
+}
+
+.checklist {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.check-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--muted-card);
+  padding: 12px;
+}
+
+.check-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.check-item span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.check-item.done {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

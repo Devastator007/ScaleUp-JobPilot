@@ -36,10 +36,10 @@ const els = {
   viewSubtitle: document.getElementById("view-subtitle"),
   planLabel: document.getElementById("plan-label"),
   licenseLabel: document.getElementById("license-label"),
-  jobDialog: document.getElementById("job-dialog"),
-  jobForm: document.getElementById("job-form"),
-  jobDialogTitle: document.getElementById("job-dialog-title"),
-  cancelJobBtn: document.getElementById("cancel-job-btn")
+  jobDialog: null,
+  jobForm: null,
+  jobDialogTitle: null,
+  cancelJobBtn: null
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -85,8 +85,6 @@ function bindEvents() {
   els.forgotPasswordBtn.addEventListener("click", () => setAuthMode("reset"));
   els.signOutBtn.addEventListener("click", signOut);
   els.newJobBtn.addEventListener("click", startSearchRun);
-  els.cancelJobBtn.addEventListener("click", () => els.jobDialog.close());
-  els.jobForm.addEventListener("submit", saveJob);
 }
 
 async function refresh() {
@@ -282,11 +280,11 @@ function setView(view) {
   document.getElementById(`${view}-view`).classList.remove("hidden");
 
   const meta = {
-    dashboard: ["Dashboard", "Search, score, review, and apply with a guided workflow."],
+    dashboard: ["Dashboard", "Upload CV, configure search, then run CV-based matching."],
     pipeline: ["Pipeline", "Track applications from discovered to offer."],
-    jobs: ["Opportunities", "Jobs discovered or reviewed by your JobPilot workflow."],
-    searches: ["Search Setup", "Choose platforms, keywords, filters, and daily limits."],
-    profile: ["Profile", "Your candidate profile and application defaults."],
+    jobs: ["Matched Jobs", "Jobs found by search/apply runs and scored against the CV."],
+    searches: ["Search & Apply", "Choose platforms, keywords, exclusions, match threshold, and daily limits."],
+    profile: ["Candidate Setup", "Upload CV and save the details JobPilot uses to match and apply."],
     billing: ["Account", "Your account access and product setup status."]
   };
   els.viewTitle.textContent = meta[view][0];
@@ -312,8 +310,9 @@ function renderDashboard() {
   const avgScore = averageScore();
 
   document.getElementById("dashboard-view").innerHTML = `
+    ${readinessPanel()}
     <div class="metrics-grid">
-      ${metric("Tracked jobs", total)}
+      ${metric("Matched jobs", total)}
       ${metric("Applied", applied)}
       ${metric("Interviews", interviews)}
       ${metric("Offers", offers)}
@@ -323,6 +322,7 @@ function renderDashboard() {
         <h2>JobPilot workflow</h2>
         <table class="table">
           <tr><th>Metric</th><th>Value</th></tr>
+          <tr><td>CV/profile ready</td><td>${hasResume() ? "Yes" : "Needs CV"}</td></tr>
           <tr><td>Search setups</td><td>${state.searches.length}</td></tr>
           <tr><td>Average CV fit score</td><td>${avgScore ? `${avgScore}%` : "No scores yet"}</td></tr>
           <tr><td>Best platform</td><td>${bestPlatform()}</td></tr>
@@ -331,7 +331,7 @@ function renderDashboard() {
           <button class="button primary" data-start-run>Start search</button>
           <button class="button secondary" data-stop-run ${state.runActive ? "" : "disabled"}>Stop</button>
         </div>
-        <p class="muted small">The hosted app prepares and tracks your search workflow. Browser-based platform automation runs from the Windows desktop app where normal browser sessions and resume files are available.</p>
+        <p class="muted small">JobPilot uses your CV and search entries to decide which roles should be reviewed or applied to. Platform sign-in and browser automation follow the same workflow as the Windows app.</p>
       </section>
       <section class="panel">
         <h2>Recent activity</h2>
@@ -369,22 +369,30 @@ function renderJobs() {
               <thead><tr><th>Role</th><th>Platform</th><th>Status</th><th>Score</th><th></th></tr></thead>
               <tbody>${state.jobs.map(jobRow).join("")}</tbody>
             </table>`
-          : empty("No opportunities yet. Create a search setup, then start a search run.")
+          : empty("No matched jobs yet. Upload the CV, create a search setup, then run search.")
       }
     </section>
   `;
-  bindDynamicActions();
 }
 
 function renderSearches() {
   document.getElementById("searches-view").innerHTML = `
     <section class="panel">
-        <h2>Create search setup</h2>
+        <h2>Create search/apply setup</h2>
         <form id="search-form" class="form-grid">
-          <label>Name<input id="search-name" placeholder="Customer Success Manager - Cairo" required /></label>
-        <label>Platforms<input id="search-platform" placeholder="LinkedIn, Indeed, Wuzzuf, Bayt" /></label>
-          <label>Keywords<input id="search-keywords" placeholder="customer success, account manager" /></label>
+          <label>Target role<input id="search-name" placeholder="Customer Success Manager" required /></label>
+          <label>Platforms<input id="search-platform" placeholder="LinkedIn, Indeed, Wuzzuf, Bayt" /></label>
+          <label>Must-have keywords<input id="search-keywords" placeholder="customer success, SaaS, account management" /></label>
           <label>Location<input id="search-location" placeholder="Remote, Cairo" /></label>
+          <label>Minimum CV match %<input id="search-min-score" type="number" min="0" max="100" value="70" /></label>
+          <label>Daily apply limit<input id="search-daily-limit" type="number" min="1" max="50" value="10" /></label>
+          <label style="grid-column:1/-1">Exclude words<input id="search-exclusions" placeholder="senior director, unpaid, internship" /></label>
+          <label style="grid-column:1/-1">Application mode
+            <select id="search-mode">
+              <option value="review">Review matches before applying</option>
+              <option value="auto">Prepare applications for jobs above threshold</option>
+            </select>
+          </label>
         <button class="button primary" type="submit">Save setup</button>
       </form>
     </section>
@@ -404,7 +412,7 @@ function renderProfile() {
   const p = state.profile || {};
   document.getElementById("profile-view").innerHTML = `
     <section class="panel">
-      <h2>Candidate profile</h2>
+      <h2>Candidate profile and CV</h2>
       <form id="profile-form" class="form-grid">
         <label>Full name<input id="profile-name" value="${escapeAttr(p.full_name || "")}" /></label>
         <label>Email<input id="profile-email" value="${escapeAttr(p.email || state.user.email || "")}" /></label>
@@ -412,12 +420,18 @@ function renderProfile() {
         <label>Location<input id="profile-location" value="${escapeAttr(p.location || "")}" /></label>
         <label>LinkedIn URL<input id="profile-linkedin" value="${escapeAttr(p.linkedin_url || "")}" /></label>
         <label>Portfolio URL<input id="profile-portfolio" value="${escapeAttr(p.portfolio_url || "")}" /></label>
-        <label style="grid-column:1/-1">Resume summary<textarea id="profile-summary" rows="5">${escapeHtml(p.resume_summary || "")}</textarea></label>
-        <button class="button primary" type="submit">Save profile</button>
+        <label style="grid-column:1/-1">Upload CV or resume<input id="profile-cv-file" type="file" accept=".txt,.md,.pdf,.doc,.docx" /></label>
+        <label style="grid-column:1/-1">CV text used for matching<textarea id="profile-summary" rows="8" placeholder="Paste the CV text here, or upload a TXT/MD resume so JobPilot can read it for matching.">${escapeHtml(p.resume_summary || "")}</textarea></label>
+        <div class="notice-box" style="grid-column:1/-1">
+          <strong>Why CV text is required</strong>
+          <p>JobPilot compares job requirements with the candidate CV before preparing applications. PDF/DOCX upload is accepted for record keeping, but paste or upload text for best matching accuracy.</p>
+        </div>
+        <button class="button primary" type="submit">Save candidate setup</button>
       </form>
     </section>
   `;
   document.getElementById("profile-form").addEventListener("submit", saveProfile);
+  document.getElementById("profile-cv-file").addEventListener("change", handleCvUpload);
 }
 
 function renderBilling() {
@@ -429,10 +443,7 @@ function renderBilling() {
         <tr><th>Product</th><td>${escapeHtml(displayPlan())}</td></tr>
         <tr><th>Status</th><td>${escapeHtml(displayStatus())}</td></tr>
       </table>
-      <div class="notice-box">
-        <strong>Windows automation required for platform applications.</strong>
-        <p>Use the desktop app to sign in to LinkedIn and other platforms, run the normal browser automation, apply Stop safely, and keep resume files on your computer. This cloud workspace keeps account, profile, search setup, and opportunity tracking online.</p>
-      </div>
+      <div class="notice-box"><strong>Setup status</strong><p>${hasResume() ? "CV is ready for matching." : "Upload or paste CV text before running search."} ${state.searches.length ? "Search setup is ready." : "Create at least one search/apply setup."}</p></div>
     </section>
   `;
 }
@@ -445,7 +456,7 @@ function jobCard(job) {
   return `
     <article class="job-card">
       <h3>${escapeHtml(job.title)}</h3>
-      <p>${escapeHtml(job.company || "Unknown")} · ${escapeHtml(job.platform || "Manual")}</p>
+      <p>${escapeHtml(job.company || "Unknown")} · ${escapeHtml(job.platform || "Imported")}</p>
       <span class="badge ${escapeAttr(job.status)}">${escapeHtml(job.status)}</span>
     </article>
   `;
@@ -455,13 +466,10 @@ function jobRow(job) {
   return `
     <tr>
       <td><strong>${escapeHtml(job.title)}</strong><br><span class="muted small">${escapeHtml(job.company || "")}</span></td>
-      <td>${escapeHtml(job.platform || "Manual")}</td>
+      <td>${escapeHtml(job.platform || "Imported")}</td>
       <td><span class="badge ${escapeAttr(job.status)}">${escapeHtml(job.status)}</span></td>
       <td>${job.match_score ?? "-"}</td>
-      <td class="row-actions">
-        <button class="button secondary" data-edit-job="${job.id}">Edit</button>
-        ${job.url ? `<a class="button ghost" href="${escapeAttr(job.url)}" target="_blank" rel="noreferrer">Open</a>` : ""}
-      </td>
+      <td>${job.url ? `<a class="button ghost" href="${escapeAttr(job.url)}" target="_blank" rel="noreferrer">Open</a>` : ""}</td>
     </tr>
   `;
 }
@@ -477,7 +485,7 @@ function searchRow(search) {
 }
 
 function eventRow(event) {
-  return `<p><strong>${escapeHtml(event.event_type)}</strong><br><span class="muted small">${escapeHtml(event.message || "")}</span></p>`;
+  return `<p><strong>${escapeHtml(titleCase(event.event_type))}</strong><br><span class="muted small">${escapeHtml(event.message || "")}</span></p>`;
 }
 
 function empty(text) {
@@ -497,7 +505,7 @@ function averageScore() {
 function bestPlatform() {
   const counts = {};
   state.jobs.forEach((job) => {
-    const key = job.platform || "Manual";
+    const key = job.platform || "Imported";
     counts[key] = (counts[key] || 0) + 1;
   });
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
@@ -511,37 +519,26 @@ function bindDynamicActions() {
   document.querySelectorAll("[data-stop-run]").forEach((button) => {
     button.addEventListener("click", stopSearchRun);
   });
-  document.querySelectorAll("[data-edit-job]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const job = state.jobs.find((item) => item.id === button.dataset.editJob);
-      openJobDialog(job);
-    });
-  });
-}
-
-function openJobDialog(job = null) {
-  if (!job) return;
-  els.jobDialogTitle.textContent = "Review opportunity";
-  document.getElementById("job-id").value = job?.id || "";
-  document.getElementById("job-title").value = job?.title || "";
-  document.getElementById("job-company").value = job?.company || "";
-  document.getElementById("job-platform").value = job?.platform || "";
-  document.getElementById("job-status").value = job?.status || "Saved";
-  document.getElementById("job-location").value = job?.location || "";
-  document.getElementById("job-score").value = job?.match_score ?? "";
-  document.getElementById("job-url").value = job?.url || "";
-  document.getElementById("job-notes").value = job?.notes || "";
-  els.jobDialog.showModal();
 }
 
 async function startSearchRun() {
+  if (!hasResume()) {
+    await logEvent("cv_required", "Upload or paste CV text before running JobPilot matching.");
+    state.view = "profile";
+    await loadData();
+    setView("profile");
+    return;
+  }
   if (!state.searches.length) {
+    await logEvent("search_setup_required", "Create a search/apply setup before running JobPilot.");
     state.view = "searches";
+    await loadData();
     setView("searches");
     return;
   }
   state.runActive = true;
-  await logEvent("search_started", `Prepared ${state.searches.length} search setup(s) for JobPilot desktop automation.`);
+  const active = state.searches[0];
+  await logEvent("search_started", `Searching ${active.platform || "selected platforms"} for ${active.name}. CV matching threshold and daily limits will be applied.`);
   await loadData();
   render();
 }
@@ -549,7 +546,7 @@ async function startSearchRun() {
 async function stopSearchRun() {
   if (!state.runActive) return;
   state.runActive = false;
-  await logEvent("search_stopped", "Stop requested for the current JobPilot workflow.");
+  await logEvent("search_stopped", "Stop requested for the current JobPilot search/apply workflow.");
   await loadData();
   render();
 }
@@ -564,42 +561,26 @@ function displayStatus() {
   return raw.toLowerCase() === "trial" ? "active" : raw;
 }
 
-async function saveJob(event) {
-  event.preventDefault();
-  const id = document.getElementById("job-id").value;
-  const payload = {
-    user_id: state.user.id,
-    title: document.getElementById("job-title").value.trim(),
-    company: document.getElementById("job-company").value.trim(),
-    platform: document.getElementById("job-platform").value.trim() || "Manual",
-    status: document.getElementById("job-status").value,
-    location: document.getElementById("job-location").value.trim(),
-    match_score: parseNullableInt(document.getElementById("job-score").value),
-    url: document.getElementById("job-url").value.trim(),
-    notes: document.getElementById("job-notes").value.trim()
-  };
-
-  const result = id
-    ? await supabaseClient.from("jobs").update(payload).eq("id", id)
-    : await supabaseClient.from("jobs").insert(payload);
-  if (result.error) {
-    alert(result.error.message);
-    return;
-  }
-
-  await logEvent(id ? "job_updated" : "job_created", `${payload.title} at ${payload.company}`);
-  els.jobDialog.close();
-  await loadData();
-  render();
-}
-
 async function saveSearch(event) {
   event.preventDefault();
+  const keywords = document.getElementById("search-keywords").value.trim();
+  const minScore = document.getElementById("search-min-score").value.trim() || "70";
+  const dailyLimit = document.getElementById("search-daily-limit").value.trim() || "10";
+  const exclusions = document.getElementById("search-exclusions").value.trim();
+  const mode = document.getElementById("search-mode").value === "auto"
+    ? "prepare applications above threshold"
+    : "review matches before applying";
   const payload = {
     user_id: state.user.id,
     name: document.getElementById("search-name").value.trim(),
     platform: document.getElementById("search-platform").value.trim(),
-    keywords: document.getElementById("search-keywords").value.trim(),
+    keywords: [
+      keywords && `keywords: ${keywords}`,
+      `minimum CV match: ${minScore}%`,
+      `daily apply limit: ${dailyLimit}`,
+      exclusions && `exclude: ${exclusions}`,
+      `mode: ${mode}`
+    ].filter(Boolean).join("\n"),
     location: document.getElementById("search-location").value.trim(),
     frequency: "manual"
   };
@@ -608,7 +589,7 @@ async function saveSearch(event) {
     alert(error.message);
     return;
   }
-  await logEvent("search_created", payload.name);
+  await logEvent("search_created", `Saved search/apply setup for ${payload.name}.`);
   await loadData();
   renderSearches();
   renderDashboard();
@@ -636,8 +617,40 @@ async function saveProfile(event) {
     return;
   }
   state.profile = data;
-  await logEvent("profile_updated", "Profile information updated");
+  await logEvent("profile_updated", hasResume() ? "Candidate profile and CV matching text updated." : "Candidate profile updated; CV text is still required.");
   renderProfile();
+}
+
+async function handleCvUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const summary = document.getElementById("profile-summary");
+  const plainText = /\.(txt|md)$/i.test(file.name);
+  if (plainText) {
+    const text = await file.text();
+    summary.value = `CV file: ${file.name}\n\n${text}`;
+    return;
+  }
+  summary.value = `CV file uploaded: ${file.name}\n\nPaste the CV text here so JobPilot can score jobs against the candidate profile.`;
+}
+
+function hasResume() {
+  return Boolean((state.profile?.resume_summary || "").trim());
+}
+
+function readinessPanel() {
+  const steps = [
+    ["CV", hasResume(), "Upload or paste CV text"],
+    ["Search", state.searches.length > 0, "Create search/apply setup"],
+    ["Run", state.events.some((event) => event.event_type === "search_started"), "Run search"]
+  ];
+  return `<section class="panel readiness-panel"><h2>Setup checklist</h2><div class="checklist">${steps.map(([label, done, text]) => `<div class="check-item ${done ? "done" : ""}"><strong>${label}</strong><span>${text}</span></div>`).join("")}</div></section>`;
+}
+
+function titleCase(value) {
+  return String(value || "")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 async function logEvent(eventType, message) {

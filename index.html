@@ -21,15 +21,15 @@
           <div class="brand-mark">S</div>
           <div>
             <div class="brand-title">ScaleUp JobPilot</div>
-            <div class="brand-subtitle">Cloud job search workspace</div>
+            <div class="brand-subtitle">CV-based search and apply</div>
           </div>
         </div>
         <nav class="nav">
           <button class="nav-item active" data-view="dashboard">Dashboard</button>
-          <button class="nav-item" data-view="searches">Search Setup</button>
-          <button class="nav-item" data-view="jobs">Opportunities</button>
+          <button class="nav-item" data-view="profile">Candidate Setup</button>
+          <button class="nav-item" data-view="searches">Search & Apply</button>
+          <button class="nav-item" data-view="jobs">Matched Jobs</button>
           <button class="nav-item" data-view="pipeline">Pipeline</button>
-          <button class="nav-item" data-view="profile">Profile</button>
           <button class="nav-item" data-view="billing">Account</button>
         </nav>
         <div class="sidebar-card">
@@ -46,7 +46,7 @@
             <p id="view-subtitle">Your job search operating system.</p>
           </div>
           <div class="topbar-actions">
-            <button id="new-job-btn" class="button secondary">Start search</button>
+            <button id="new-job-btn" class="button secondary">Run search</button>
             <button id="sign-out-btn" class="button ghost">Sign out</button>
           </div>
         </header>
@@ -61,8 +61,7 @@
             <p class="eyebrow">ScaleUp JobPilot</p>
             <h2>Sellable cloud workspace for serious job seekers</h2>
             <p>
-              Create an account to manage saved searches, applications, AI-fit notes,
-              follow-ups, and analytics in a Supabase-backed app.
+              Create an account, upload your CV, choose target roles, and let JobPilot match your profile before applications are prepared.
             </p>
           </div>
           <form id="auth-form" class="auth-form">
@@ -89,34 +88,6 @@
       </main>
     </div>
 
-    <dialog id="job-dialog" class="dialog">
-      <form id="job-form" method="dialog">
-        <h2 id="job-dialog-title">Review opportunity</h2>
-        <input type="hidden" id="job-id" />
-        <div class="form-grid">
-          <label>Title<input id="job-title" required /></label>
-          <label>Company<input id="job-company" required /></label>
-          <label>Platform<input id="job-platform" placeholder="LinkedIn" /></label>
-          <label>Status
-            <select id="job-status">
-              <option>Saved</option>
-              <option>Applied</option>
-              <option>Interviewing</option>
-              <option>Offer</option>
-              <option>Rejected</option>
-            </select>
-          </label>
-          <label>Location<input id="job-location" /></label>
-          <label>Match score<input id="job-score" type="number" min="0" max="100" /></label>
-        </div>
-        <label>Job URL<input id="job-url" type="url" /></label>
-        <label>Notes<textarea id="job-notes" rows="4"></textarea></label>
-        <div class="dialog-actions">
-          <button type="button" class="button ghost" id="cancel-job-btn">Cancel</button>
-          <button type="submit" class="button primary">Save review</button>
-        </div>
-      </form>
-    </dialog>
   </body>
 </html>
 
