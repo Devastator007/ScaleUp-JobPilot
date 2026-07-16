@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -8,6 +8,7 @@
       name="description"
       content="AI job search workspace for saved searches, applications, pipeline tracking, and analytics."
     />
+    <meta name="robots" content="noindex,nofollow" />
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js"></script>
@@ -67,10 +68,12 @@
           <form id="auth-form" class="auth-form">
             <label>Email<input id="auth-email" type="email" required /></label>
             <label>Password<input id="auth-password" type="password" minlength="6" required /></label>
+            <label id="auth-confirm-wrap" class="hidden">Retype password<input id="auth-confirm-password" type="password" minlength="6" /></label>
             <div class="auth-actions">
-              <button class="button primary" type="submit" data-auth-mode="signin">Sign in</button>
+              <button class="button primary" type="submit" id="auth-submit-btn">Sign in</button>
               <button class="button secondary" type="button" id="signup-btn">Create account</button>
             </div>
+            <button class="button ghost auth-link" type="button" id="forgot-password-btn">Forgot password?</button>
             <p id="auth-message" class="form-message"></p>
           </form>
         </section>
@@ -116,3 +119,4 @@
     </dialog>
   </body>
 </html>
+

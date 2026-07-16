@@ -183,6 +183,11 @@ h1 {
   background: transparent;
 }
 
+.auth-link {
+  justify-self: start;
+  padding: 0;
+}
+
 .button.danger {
   color: white;
   background: var(--bad);
@@ -273,6 +278,10 @@ textarea {
   margin: 0;
   color: var(--bad);
   font-size: 13px;
+}
+
+.form-message.success {
+  color: var(--ok);
 }
 
 .metrics-grid {

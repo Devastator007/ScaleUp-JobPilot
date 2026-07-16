@@ -12,7 +12,8 @@ const state = {
   jobs: [],
   searches: [],
   events: [],
-  view: "dashboard"
+  view: "dashboard",
+  authMode: "signin"
 };
 
 const els = {
@@ -22,8 +23,12 @@ const els = {
   authForm: document.getElementById("auth-form"),
   authEmail: document.getElementById("auth-email"),
   authPassword: document.getElementById("auth-password"),
+  authConfirmWrap: document.getElementById("auth-confirm-wrap"),
+  authConfirmPassword: document.getElementById("auth-confirm-password"),
+  authSubmitBtn: document.getElementById("auth-submit-btn"),
   authMessage: document.getElementById("auth-message"),
   signupBtn: document.getElementById("signup-btn"),
+  forgotPasswordBtn: document.getElementById("forgot-password-btn"),
   signOutBtn: document.getElementById("sign-out-btn"),
   newJobBtn: document.getElementById("new-job-btn"),
   viewTitle: document.getElementById("view-title"),
@@ -49,8 +54,13 @@ async function init() {
 
   const { data } = await supabaseClient.auth.getSession();
   state.user = data.session?.user || null;
-  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
     state.user = session?.user || null;
+    if (event === "PASSWORD_RECOVERY") {
+      setAuthMode("recovery", "Enter a new password to finish resetting your account.");
+      showAuth(els.authMessage.textContent);
+      return;
+    }
     await refresh();
   });
   await refresh();
@@ -63,9 +73,15 @@ function bindEvents() {
 
   els.authForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    await signIn();
+    if (state.authMode === "signup") await signUp();
+    else if (state.authMode === "reset") await requestPasswordReset();
+    else if (state.authMode === "recovery") await updatePassword();
+    else await signIn();
   });
-  els.signupBtn.addEventListener("click", signUp);
+  els.signupBtn.addEventListener("click", () => {
+    setAuthMode(state.authMode === "signup" ? "signin" : "signup");
+  });
+  els.forgotPasswordBtn.addEventListener("click", () => setAuthMode("reset"));
   els.signOutBtn.addEventListener("click", signOut);
   els.newJobBtn.addEventListener("click", () => openJobDialog());
   els.cancelJobBtn.addEventListener("click", () => els.jobDialog.close());
@@ -110,13 +126,49 @@ async function signIn() {
 
 async function signUp() {
   clearAuthMessage();
+  if (!passwordsMatch()) return;
   const { error } = await supabaseClient.auth.signUp({
     email: els.authEmail.value.trim(),
+    password: els.authPassword.value,
+    options: { emailRedirectTo: authRedirectUrl() }
+  });
+  if (error) {
+    showAuthMessage(error.message, "error");
+    return;
+  }
+  setAuthMode("signin");
+  showAuthMessage("Account created. Please check your email to confirm your account before signing in.", "success");
+}
+
+async function requestPasswordReset() {
+  clearAuthMessage();
+  const email = els.authEmail.value.trim();
+  if (!email) {
+    showAuthMessage("Enter your email address first.", "error");
+    return;
+  }
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: authRedirectUrl()
+  });
+  showAuthMessage(
+    error ? error.message : "Password reset email sent. Please check your inbox.",
+    error ? "error" : "success"
+  );
+}
+
+async function updatePassword() {
+  clearAuthMessage();
+  if (!passwordsMatch()) return;
+  const { error } = await supabaseClient.auth.updateUser({
     password: els.authPassword.value
   });
-  els.authMessage.textContent = error
-    ? error.message
-    : "Account created. Check email confirmation if your Supabase project requires it.";
+  if (error) {
+    showAuthMessage(error.message, "error");
+    return;
+  }
+  await supabaseClient.auth.signOut();
+  setAuthMode("signin");
+  showAuthMessage("Password updated. Sign in with your new password.", "success");
 }
 
 async function signOut() {
@@ -124,7 +176,47 @@ async function signOut() {
 }
 
 function clearAuthMessage() {
-  els.authMessage.textContent = "";
+  showAuthMessage("", "error");
+}
+
+function showAuthMessage(message, type = "error") {
+  els.authMessage.textContent = message || "";
+  els.authMessage.classList.toggle("success", type === "success");
+}
+
+function setAuthMode(mode, message = "") {
+  state.authMode = mode;
+  const needsPassword = mode !== "reset";
+  const needsConfirm = mode === "signup" || mode === "recovery";
+  els.authPassword.parentElement.classList.toggle("hidden", !needsPassword);
+  els.authPassword.required = needsPassword;
+  els.authConfirmWrap.classList.toggle("hidden", !needsConfirm);
+  els.authConfirmPassword.required = needsConfirm;
+  els.authSubmitBtn.textContent =
+    mode === "signup" ? "Create account" :
+    mode === "reset" ? "Send reset email" :
+    mode === "recovery" ? "Update password" :
+    "Sign in";
+  els.signupBtn.textContent = mode === "signup" ? "I already have an account" : "Create account";
+  els.forgotPasswordBtn.classList.toggle("hidden", mode === "reset" || mode === "recovery");
+  els.authMessage.textContent = message;
+  els.authMessage.classList.remove("success");
+}
+
+function passwordsMatch() {
+  if (els.authPassword.value.length < 6) {
+    showAuthMessage("Password must be at least 6 characters.", "error");
+    return false;
+  }
+  if (els.authPassword.value !== els.authConfirmPassword.value) {
+    showAuthMessage("Passwords do not match.", "error");
+    return false;
+  }
+  return true;
+}
+
+function authRedirectUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
 }
 
 async function ensureProfile() {
