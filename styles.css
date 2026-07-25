@@ -250,12 +250,44 @@ h1 {
   padding: 24px;
 }
 
-label {
+label,
+.auth-field {
   display: grid;
   gap: 6px;
   color: #334155;
   font-size: 13px;
   font-weight: 700;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 76px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 5px;
+  padding: 5px 7px;
+  color: var(--brand-dark);
+  background: #eff6ff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  background: #dbeafe;
+}
+
+.password-toggle:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
 }
 
 input,
