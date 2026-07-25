@@ -27,6 +27,7 @@ const els = {
   appView: document.getElementById("app-view"),
   authForm: document.getElementById("auth-form"),
   authEmail: document.getElementById("auth-email"),
+  authPasswordWrap: document.getElementById("auth-password-wrap"),
   authPassword: document.getElementById("auth-password"),
   authConfirmWrap: document.getElementById("auth-confirm-wrap"),
   authConfirmPassword: document.getElementById("auth-confirm-password"),
@@ -87,6 +88,9 @@ function bindEvents() {
     setAuthMode(state.authMode === "signup" ? "signin" : "signup");
   });
   els.forgotPasswordBtn.addEventListener("click", () => setAuthMode("reset"));
+  document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+    button.addEventListener("click", () => togglePasswordVisibility(button));
+  });
   els.signOutBtn.addEventListener("click", signOut);
   els.newJobBtn.addEventListener("click", startSearchRun);
 }
@@ -189,9 +193,10 @@ function showAuthMessage(message, type = "error") {
 
 function setAuthMode(mode, message = "") {
   state.authMode = mode;
+  resetPasswordVisibility();
   const needsPassword = mode !== "reset";
   const needsConfirm = mode === "signup" || mode === "recovery";
-  els.authPassword.parentElement.classList.toggle("hidden", !needsPassword);
+  els.authPasswordWrap.classList.toggle("hidden", !needsPassword);
   els.authPassword.required = needsPassword;
   els.authConfirmWrap.classList.toggle("hidden", !needsConfirm);
   els.authConfirmPassword.required = needsConfirm;
@@ -204,6 +209,26 @@ function setAuthMode(mode, message = "") {
   els.forgotPasswordBtn.classList.toggle("hidden", mode === "reset" || mode === "recovery");
   els.authMessage.textContent = message;
   els.authMessage.classList.remove("success");
+}
+
+function togglePasswordVisibility(button) {
+  const input = document.getElementById(button.dataset.passwordToggle);
+  if (!input) return;
+  const visible = input.type === "password";
+  input.type = visible ? "text" : "password";
+  button.textContent = visible ? "Hide" : "Show";
+  button.setAttribute("aria-pressed", String(visible));
+  button.setAttribute("aria-label", visible ? "Hide password" : "Show password");
+}
+
+function resetPasswordVisibility() {
+  document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+    const input = document.getElementById(button.dataset.passwordToggle);
+    if (input) input.type = "password";
+    button.textContent = "Show";
+    button.setAttribute("aria-pressed", "false");
+    button.setAttribute("aria-label", "Show password");
+  });
 }
 
 function passwordsMatch() {
