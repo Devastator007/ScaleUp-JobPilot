@@ -66,8 +66,20 @@
           </div>
           <form id="auth-form" class="auth-form">
             <label>Email<input id="auth-email" type="email" required /></label>
-            <label>Password<input id="auth-password" type="password" minlength="6" required /></label>
-            <label id="auth-confirm-wrap" class="hidden">Retype password<input id="auth-confirm-password" type="password" minlength="6" /></label>
+            <div id="auth-password-wrap" class="auth-field">
+              <label for="auth-password">Password</label>
+              <div class="password-field">
+                <input id="auth-password" type="password" minlength="6" autocomplete="current-password" required />
+                <button class="password-toggle" type="button" data-password-toggle="auth-password" aria-controls="auth-password" aria-label="Show password" aria-pressed="false">Show</button>
+              </div>
+            </div>
+            <div id="auth-confirm-wrap" class="auth-field hidden">
+              <label for="auth-confirm-password">Retype password</label>
+              <div class="password-field">
+                <input id="auth-confirm-password" type="password" minlength="6" autocomplete="new-password" />
+                <button class="password-toggle" type="button" data-password-toggle="auth-confirm-password" aria-controls="auth-confirm-password" aria-label="Show retyped password" aria-pressed="false">Show</button>
+              </div>
+            </div>
             <div class="auth-actions">
               <button class="button primary" type="submit" id="auth-submit-btn">Sign in</button>
               <button class="button secondary" type="button" id="signup-btn">Create account</button>
