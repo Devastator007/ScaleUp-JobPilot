@@ -104,6 +104,7 @@ async function refresh() {
   showApp();
   await ensureProfile();
   await loadData();
+  applyEntitlementState();
   setView(state.view);
 }
 
@@ -266,8 +267,8 @@ async function ensureProfile() {
     full_name: "",
     target_title: "",
     location: "",
-    plan: "JobPilot Access",
-    license_status: "active"
+    plan: "trial",
+    license_status: "trial"
   };
   const { data: created, error: createError } = await supabaseClient
     .from("profiles")
@@ -301,12 +302,12 @@ async function loadData() {
 }
 
 function setView(view) {
-  state.view = view;
+  state.view = hasActiveAccess() ? view : "billing";
   document.querySelectorAll(".nav-item").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === view);
+    button.classList.toggle("active", button.dataset.view === state.view);
   });
   document.querySelectorAll(".view").forEach((section) => section.classList.add("hidden"));
-  document.getElementById(`${view}-view`).classList.remove("hidden");
+  document.getElementById(`${state.view}-view`).classList.remove("hidden");
 
   const meta = {
     dashboard: ["Dashboard", "Upload CV, configure search, then run CV-based matching."],
@@ -316,8 +317,8 @@ function setView(view) {
     profile: ["Candidate Setup", "Upload CV and save the details JobPilot uses to match and apply."],
     billing: ["Account", "Your account access and product setup status."]
   };
-  els.viewTitle.textContent = meta[view][0];
-  els.viewSubtitle.textContent = meta[view][1];
+  els.viewTitle.textContent = meta[state.view][0];
+  els.viewSubtitle.textContent = meta[state.view][1];
   render();
 }
 
@@ -481,8 +482,11 @@ function renderBilling() {
         <tr><th>Account</th><td>${escapeHtml(state.user.email || "")}</td></tr>
         <tr><th>Product</th><td>${escapeHtml(displayPlan())}</td></tr>
         <tr><th>Status</th><td>${escapeHtml(displayStatus())}</td></tr>
+        <tr><th>Access until</th><td>${subscriptionExpiresAt() ? escapeHtml(subscriptionExpiresAt().toLocaleDateString()) : "Not activated"}</td></tr>
       </table>
-      <div class="notice-box"><strong>Setup status</strong><p>${hasResume() ? "CV is ready for matching." : "Upload or paste CV text before running search."} ${state.searches.length ? "Search setup is ready." : "Create at least one search/apply setup."}</p></div>
+      ${hasActiveAccess()
+        ? `<div class="notice-box"><strong>Setup status</strong><p>${hasResume() ? "CV is ready for matching." : "Upload or paste CV text before running search."} ${state.searches.length ? "Search setup is ready." : "Create at least one search/apply setup."}</p></div>`
+        : `<div class="notice-box"><strong>Activation required</strong><p>JobPilot access starts after manual InstaPay or bank-transfer verification. Contact ${escapeHtml(cfg.SUPPORT_EMAIL || "support@scaleuptech.org")} with your transfer reference for approval or renewal.</p></div>`}
     </section>
   `;
 }
@@ -568,6 +572,11 @@ function bindDynamicActions() {
 }
 
 async function startSearchRun() {
+  if (!hasActiveAccess()) {
+    state.view = "billing";
+    setView("billing");
+    return;
+  }
   if (!hasResume()) {
     await logEvent("cv_required", "Upload or paste CV text before running JobPilot matching.");
     state.view = "profile";
@@ -602,14 +611,41 @@ async function stopSearchRun() {
   render();
 }
 
+function subscriptionExpiresAt() {
+  const value = state.subscription?.current_period_end;
+  if (!value) return null;
+  const expiresAt = new Date(value);
+  return Number.isNaN(expiresAt.getTime()) ? null : expiresAt;
+}
+
+function hasActiveAccess() {
+  if (state.subscription) {
+    const expiresAt = subscriptionExpiresAt();
+    return ["active", "approved"].includes(String(state.subscription.status || "").toLowerCase())
+      && expiresAt
+      && expiresAt.getTime() > Date.now();
+  }
+  return ["active", "approved"].includes(String(state.profile?.license_status || "").toLowerCase());
+}
+
 function displayPlan() {
-  const raw = state.subscription?.plan || state.profile?.plan || "JobPilot Access";
-  return raw.toLowerCase() === "trial" ? "JobPilot Access" : raw;
+  return state.subscription?.plan || state.profile?.plan || "trial";
 }
 
 function displayStatus() {
-  const raw = state.subscription?.status || state.profile?.license_status || "active";
-  return raw.toLowerCase() === "trial" ? "active" : raw;
+  if (state.subscription && subscriptionExpiresAt()?.getTime() <= Date.now()) return "expired";
+  return state.subscription?.status || state.profile?.license_status || "trial";
+}
+
+function applyEntitlementState() {
+  const active = hasActiveAccess();
+  els.newJobBtn.classList.toggle("hidden", !active);
+  document.querySelectorAll(".nav-item").forEach((button) => {
+    const disabled = !active && button.dataset.view !== "billing";
+    button.disabled = disabled;
+    button.setAttribute("aria-disabled", String(disabled));
+  });
+  if (!active) state.view = "billing";
 }
 
 async function saveSearch(event) {

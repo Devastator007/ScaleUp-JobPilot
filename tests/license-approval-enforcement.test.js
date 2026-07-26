@@ -24,7 +24,9 @@ test("authenticated users cannot change existing plan or license values", () => 
   assert.match(migration, /service-role admin workflows may approve manual payments/i);
 });
 
-test("regression documents the unsafe client payload still neutralized by the database", () => {
-  assert.match(app, /license_status:\s*"active"/);
+test("browser defaults are safe and database enforcement remains defense in depth", () => {
+  assert.match(app, /plan:\s*"trial"/);
+  assert.match(app, /license_status:\s*"trial"/);
+  assert.doesNotMatch(app, /license_status:\s*"active"/);
   assert.match(migration, /trg_profiles_enforce_license_approval/);
 });
