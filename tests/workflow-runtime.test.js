@@ -36,8 +36,15 @@ test("Pages deployment safeguards remain enabled", () => {
 
 test("Pages deployment performs a fail-closed live verification", () => {
   assert.match(pages, /PAGE_URL:\s*\$\{\{ steps\.deployment\.outputs\.page_url \}\}/);
-  assert.match(pages, /curl --silent --show-error --location/);
-  assert.match(pages, /status" = "200"/);
+  assert.equal((pages.match(/curl --silent --show-error --location/g) || []).length, 4);
+  assert.match(pages, /index_status" = "200"/);
+  assert.match(pages, /app_status" = "200"/);
+  assert.match(pages, /config_status" = "200"/);
+  assert.match(pages, /styles_status" = "200"/);
   assert.match(pages, /grep -q "ScaleUp JobPilot"/);
+  assert.match(pages, /grep -q "async function signUp"/);
+  assert.match(pages, /grep -q "function hasActiveAccess"/);
+  assert.match(pages, /grep -q "SUPABASE_URL"/);
+  assert.ok(pages.includes('grep -q "\\\\.auth-card"'));
   assert.match(pages, /exit 1/);
 });
