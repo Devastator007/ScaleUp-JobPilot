@@ -13,9 +13,10 @@ const packageJson = JSON.parse(read("package.json"));
 
 test("GitHub workflow actions use the Node 24 generation", () => {
   const workflows = ci + "\n" + pages;
-  assert.doesNotMatch(workflows, /actions\/(?:checkout|setup-node)@v4/);
+  assert.doesNotMatch(workflows, /actions\/checkout@v4/);
+  assert.doesNotMatch(workflows, /actions\/setup-node@v[1-6](?:\b|\.)/);
   assert.equal((workflows.match(/actions\/checkout@v5/g) || []).length, 2);
-  assert.equal((workflows.match(/actions\/setup-node@v5/g) || []).length, 1);
+  assert.equal((workflows.match(/actions\/setup-node@v7/g) || []).length, 1);
 });
 
 test("CI and package metadata require Node 24", () => {
