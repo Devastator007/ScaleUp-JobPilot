@@ -14,10 +14,6 @@ const state = {
   events: [],
   view: "dashboard",
   authMode: "signin",
-  runActive: false,
-  runProgress: 0,
-  runStage: "Ready",
-  runTimer: null,
   editingSearchId: null
 };
 
@@ -92,7 +88,7 @@ function bindEvents() {
     button.addEventListener("click", () => togglePasswordVisibility(button));
   });
   els.signOutBtn.addEventListener("click", signOut);
-  els.newJobBtn.addEventListener("click", startSearchRun);
+  els.newJobBtn.addEventListener("click", openJobEntry);
 }
 
 async function refresh() {
@@ -310,10 +306,10 @@ function setView(view) {
   document.getElementById(`${state.view}-view`).classList.remove("hidden");
 
   const meta = {
-    dashboard: ["Dashboard", "Upload CV, configure search, then run CV-based matching."],
+    dashboard: ["Dashboard", "Organize target roles, record opportunities, and manage applications."],
     pipeline: ["Pipeline", "Track applications from discovered to offer."],
-    jobs: ["Matched Jobs", "Jobs found by search/apply runs and scored against the CV."],
-    searches: ["Search & Apply", "Choose platforms, keywords, exclusions, match threshold, and daily limits."],
+    jobs: ["Jobs", "Record opportunities and manage their application status."],
+    searches: ["Search Plans", "Save target roles, platforms, locations, and review criteria."],
     profile: ["Candidate Setup", "Upload CV and save the details JobPilot uses to match and apply."],
     billing: ["Account", "Your account access and product setup status."]
   };
@@ -357,12 +353,10 @@ function renderDashboard() {
           <tr><td>Average CV fit score</td><td>${avgScore ? `${avgScore}%` : "No scores yet"}</td></tr>
           <tr><td>Best platform</td><td>${bestPlatform()}</td></tr>
         </table>
-        ${progressPanel()}
         <div class="panel-actions">
-          <button class="button primary" data-start-run>Start search</button>
-          <button class="button secondary" data-stop-run ${state.runActive ? "" : "disabled"}>Stop</button>
+          <button class="button primary" data-add-job>Add job</button>
         </div>
-        <p class="muted small">JobPilot uses your CV and search entries to decide which roles should be reviewed or applied to. Platform sign-in and browser automation follow the same workflow as the Windows app.</p>
+        <p class="muted small">Use search plans to keep your criteria consistent, then record suitable opportunities and move them through the application pipeline.</p>
       </section>
       <section class="panel">
         <div class="panel-title-row">
@@ -396,6 +390,25 @@ function renderPipeline() {
 function renderJobs() {
   document.getElementById("jobs-view").innerHTML = `
     <section class="panel">
+      <h2>Add a job</h2>
+      <form id="job-form" class="form-grid">
+        <label>Role title<input id="job-title" required placeholder="Customer Success Manager" /></label>
+        <label>Company<input id="job-company" placeholder="Company name" /></label>
+        <label>Platform<input id="job-platform" placeholder="LinkedIn, Wuzzuf, referral" /></label>
+        <label>Location<input id="job-location" placeholder="Cairo, Remote" /></label>
+        <label>Status
+          <select id="job-status">
+            ${statusOrder.map((status) => `<option value="${status}">${status}</option>`).join("")}
+          </select>
+        </label>
+        <label>CV fit score %<input id="job-score" type="number" min="0" max="100" placeholder="Optional" /></label>
+        <label style="grid-column:1/-1">Job URL<input id="job-url" type="url" placeholder="https://…" /></label>
+        <label style="grid-column:1/-1">Notes<textarea id="job-notes" rows="4" placeholder="Requirements, contact, next step…"></textarea></label>
+        <button class="button primary" type="submit">Save job</button>
+        <p id="job-form-result" class="form-message" aria-live="polite"></p>
+      </form>
+    </section>
+    <section class="panel">
       <h2>All jobs</h2>
       ${
         state.jobs.length
@@ -403,10 +416,11 @@ function renderJobs() {
               <thead><tr><th>Role</th><th>Platform</th><th>Status</th><th>Score</th><th></th></tr></thead>
               <tbody>${state.jobs.map(jobRow).join("")}</tbody>
             </table>`
-          : empty("No matched jobs yet. Upload the CV, create a search setup, then run search.")
+          : empty("No jobs yet. Add the first opportunity above.")
       }
     </section>
   `;
+  document.getElementById("job-form").addEventListener("submit", saveJob);
 }
 
 function renderSearches() {
@@ -557,11 +571,8 @@ function bestPlatform() {
 }
 
 function bindDynamicActions() {
-  document.querySelectorAll("[data-start-run]").forEach((button) => {
-    button.addEventListener("click", startSearchRun);
-  });
-  document.querySelectorAll("[data-stop-run]").forEach((button) => {
-    button.addEventListener("click", stopSearchRun);
+  document.querySelectorAll("[data-add-job]").forEach((button) => {
+    button.addEventListener("click", openJobEntry);
   });
   document.querySelectorAll("[data-edit-search]").forEach((button) => {
     button.addEventListener("click", () => editSearchSetup(button.dataset.editSearch));
@@ -571,44 +582,13 @@ function bindDynamicActions() {
   });
 }
 
-async function startSearchRun() {
+function openJobEntry() {
   if (!hasActiveAccess()) {
-    state.view = "billing";
     setView("billing");
     return;
   }
-  if (!hasResume()) {
-    await logEvent("cv_required", "Upload or paste CV text before running JobPilot matching.");
-    state.view = "profile";
-    await loadData();
-    setView("profile");
-    return;
-  }
-  if (!state.searches.length) {
-    await logEvent("search_setup_required", "Create a search/apply setup before running JobPilot.");
-    state.view = "searches";
-    await loadData();
-    setView("searches");
-    return;
-  }
-  state.runActive = true;
-  state.runProgress = 0;
-  state.runStage = "Preparing CV and search filters";
-  startProgressTimer();
-  const active = state.searches[0];
-  await logEvent("search_started", `Searching ${active.platform || "selected platforms"} for ${active.name}. CV matching threshold and daily limits will be applied.`);
-  await loadData();
-  render();
-  await runOnlineSearch(active);
-}
-
-async function stopSearchRun() {
-  if (!state.runActive) return;
-  state.runActive = false;
-  stopProgressTimer("Stopped", state.runProgress);
-  await logEvent("search_stopped", "Stop requested for the current JobPilot search/apply workflow.");
-  await loadData();
-  render();
+  setView("jobs");
+  document.getElementById("job-title")?.focus();
 }
 
 function subscriptionExpiresAt() {
@@ -687,6 +667,32 @@ async function saveSearch(event) {
   renderDashboard();
 }
 
+async function saveJob(event) {
+  event.preventDefault();
+  const result = document.getElementById("job-form-result");
+  result.textContent = "";
+  const payload = {
+    user_id: state.user.id,
+    title: document.getElementById("job-title").value.trim(),
+    company: document.getElementById("job-company").value.trim(),
+    platform: document.getElementById("job-platform").value.trim() || "Manual",
+    status: document.getElementById("job-status").value,
+    location: document.getElementById("job-location").value.trim(),
+    url: document.getElementById("job-url").value.trim(),
+    notes: document.getElementById("job-notes").value.trim(),
+    match_score: parseNullableInt(document.getElementById("job-score").value)
+  };
+  const { error } = await supabaseClient.from("jobs").insert(payload);
+  if (error) {
+    result.textContent = error.message;
+    return;
+  }
+  await logEvent("job_added", `Added ${payload.title} at ${payload.company || "an unspecified company"}.`);
+  await loadData();
+  render();
+  document.getElementById("job-form-result").textContent = "Job saved.";
+}
+
 function editSearchSetup(id) {
   state.editingSearchId = id;
   state.view = "searches";
@@ -733,92 +739,6 @@ function parseSearchKeywords(value) {
     exclusions: read("exclude:"),
     mode: modeText.includes("prepare") ? "auto" : "review"
   };
-}
-
-async function runOnlineSearch(search) {
-  try {
-    const parsed = parseSearchKeywords(search.keywords || "");
-    state.runProgress = 18;
-    state.runStage = "Calling JobPilot search service";
-    renderDashboard();
-
-    const response = await fetch("/api/jobpilot-search.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        keywords: parsed.keywords || search.name,
-        platforms: search.platform || "LinkedIn, Indeed, Wuzzuf",
-        location: search.location || state.profile?.location || "Remote",
-        exclusions: parsed.exclusions,
-        limit: parsed.dailyLimit || 10
-      })
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "Search service failed");
-
-    state.runProgress = 54;
-    state.runStage = "Scoring jobs against CV";
-    renderDashboard();
-
-    const minScore = Number.parseInt(parsed.minScore || "70", 10);
-    const existingUrls = new Set(state.jobs.map((job) => job.url).filter(Boolean));
-    const matched = (payload.jobs || [])
-      .map((job) => ({ ...job, match_score: scoreJob(job, state.profile?.resume_summary || "", parsed.keywords) }))
-      .filter((job) => job.match_score >= minScore && !existingUrls.has(job.url));
-
-    state.runProgress = 78;
-    state.runStage = `Saving ${matched.length} matched job(s)`;
-    renderDashboard();
-
-    if (matched.length) {
-      const rows = matched.map((job) => ({
-        user_id: state.user.id,
-        saved_search_id: search.id,
-        title: job.title || "Untitled role",
-        company: job.company || "Unknown",
-        platform: job.platform || "Imported",
-        status: "Saved",
-        location: job.location || "",
-        url: job.url || "",
-        description: job.description || "",
-        match_score: job.match_score,
-        ai_summary: `Matched from ${search.name} using CV keywords.`
-      }));
-      const { error } = await supabaseClient.from("jobs").insert(rows);
-      if (error) throw error;
-    }
-
-    state.runActive = false;
-    stopProgressTimer("Search completed", 100);
-    await logEvent("search_completed", `Found ${payload.jobs?.length || 0} job(s), saved ${matched.length} CV-matched job(s).`);
-    await loadData();
-    render();
-  } catch (error) {
-    state.runActive = false;
-    stopProgressTimer("Search failed", state.runProgress || 0);
-    await logEvent("search_failed", error.message || "Search failed");
-    await loadData();
-    render();
-  }
-}
-
-function scoreJob(job, resumeText, keywordText) {
-  const haystack = `${job.title || ""} ${job.company || ""} ${job.description || ""}`.toLowerCase();
-  const resumeTerms = extractTerms(`${resumeText} ${keywordText}`);
-  if (!resumeTerms.length) return 0;
-  const matched = resumeTerms.filter((term) => haystack.includes(term)).length;
-  return Math.min(100, Math.round((matched / Math.min(resumeTerms.length, 30)) * 100));
-}
-
-function extractTerms(text) {
-  const stop = new Set(["and", "the", "for", "with", "from", "that", "this", "your", "you", "are", "was", "were", "have", "has", "will", "job", "role"]);
-  return [...new Set(String(text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9+#.\s-]/g, " ")
-    .split(/\s+/)
-    .map((term) => term.trim())
-    .filter((term) => term.length >= 3 && !stop.has(term)))]
-    .slice(0, 80);
 }
 
 async function clearActivity() {
@@ -881,46 +801,9 @@ function readinessPanel() {
   const steps = [
     ["CV", hasResume(), "Upload or paste CV text"],
     ["Search", state.searches.length > 0, "Create search/apply setup"],
-    ["Run", state.events.some((event) => event.event_type === "search_started"), "Run search"]
+    ["Jobs", state.jobs.length > 0, "Add an opportunity"]
   ];
   return `<section class="panel readiness-panel"><h2>Setup checklist</h2><div class="checklist">${steps.map(([label, done, text]) => `<div class="check-item ${done ? "done" : ""}"><strong>${label}</strong><span>${text}</span></div>`).join("")}</div></section>`;
-}
-
-function progressPanel() {
-  return `<div class="progress-wrap">
-    <div class="progress-head"><strong>${state.runActive ? "Search running" : "Search progress"}</strong><span>${state.runProgress}%</span></div>
-    <div class="progress-track"><div class="progress-fill" style="width:${state.runProgress}%"></div></div>
-    <p class="muted small">${escapeHtml(state.runStage)}</p>
-  </div>`;
-}
-
-function startProgressTimer() {
-  clearInterval(state.runTimer);
-  const stages = [
-    [12, "Reading CV and profile"],
-    [24, "Preparing platform search filters"],
-    [38, "Checking search/apply setup"],
-    [52, "Scoring candidate fit rules"],
-    [68, "Waiting for scraping worker connection"],
-    [82, "Ready to import matched jobs"],
-    [95, "Run is still active"]
-  ];
-  state.runTimer = setInterval(() => {
-    if (!state.runActive) return;
-    const next = stages.find(([pct]) => pct > state.runProgress);
-    if (next) {
-      state.runProgress = next[0];
-      state.runStage = next[1];
-    }
-    renderDashboard();
-  }, 1200);
-}
-
-function stopProgressTimer(stage, progress = state.runProgress) {
-  clearInterval(state.runTimer);
-  state.runTimer = null;
-  state.runProgress = progress;
-  state.runStage = stage;
 }
 
 function titleCase(value) {
