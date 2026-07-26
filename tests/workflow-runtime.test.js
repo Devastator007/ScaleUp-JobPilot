@@ -32,3 +32,11 @@ test("Pages deployment safeguards remain enabled", () => {
   assert.match(pages, /actions\/upload-pages-artifact@v3/);
   assert.match(pages, /actions\/deploy-pages@v4/);
 });
+
+test("Pages deployment performs a fail-closed live verification", () => {
+  assert.match(pages, /PAGE_URL:\s*\$\{\{ steps\.deployment\.outputs\.page_url \}\}/);
+  assert.match(pages, /curl --silent --show-error --location/);
+  assert.match(pages, /status" = "200"/);
+  assert.match(pages, /grep -q "ScaleUp JobPilot"/);
+  assert.match(pages, /exit 1/);
+});
