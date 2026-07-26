@@ -29,6 +29,7 @@ test("Pages deployment safeguards remain enabled", () => {
   assert.match(pages, /pages:\s*write/);
   assert.match(pages, /id-token:\s*write/);
   assert.match(pages, /actions\/configure-pages@v5/);
+  assert.doesNotMatch(pages, /enablement:\s*true/);
   assert.match(pages, /actions\/upload-pages-artifact@v3/);
   assert.match(pages, /actions\/deploy-pages@v4/);
 });
