@@ -1,0 +1,54 @@
+.auth-divider {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  background: var(--border, #d8dee8);
+  content: "";
+  flex: 1;
+  height: 1px;
+}
+
+.auth-divider span,
+.provider-note {
+  color: var(--muted, #667085);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.account-provider-button {
+  width: 100%;
+}
+
+.connected-accounts-panel {
+  margin-top: 16px;
+}
+
+.connected-account-row {
+  align-items: center;
+  border-top: 1px solid var(--border, #e4e7ec);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 0;
+}
+
+.connected-account-row:last-of-type {
+  border-bottom: 1px solid var(--border, #e4e7ec);
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .connected-account-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .connected-account-row .button {
+    width: 100%;
+  }
+}
