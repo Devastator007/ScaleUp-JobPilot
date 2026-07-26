@@ -50,14 +50,26 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$PAGE_URL"
+          base_url="${PAGE_URL%/}"
           for attempt in {1..12}; do
-            status=$(curl --silent --show-error --location --output /tmp/jobpilot.html --write-out '%{http_code}' "$PAGE_URL" || true)
-            if [ "$status" = "200" ] && grep -q "ScaleUp JobPilot" /tmp/jobpilot.html; then
-              echo "Live verification passed: $PAGE_URL returned HTTP 200 with the expected application marker."
+            index_status=$(curl --silent --show-error --location --output /tmp/jobpilot.html --write-out '%{http_code}' "$PAGE_URL" || true)
+            app_status=$(curl --silent --show-error --location --output /tmp/jobpilot-app.js --write-out '%{http_code}' "$base_url/app.js" || true)
+            config_status=$(curl --silent --show-error --location --output /tmp/jobpilot-config.js --write-out '%{http_code}' "$base_url/config.js" || true)
+            styles_status=$(curl --silent --show-error --location --output /tmp/jobpilot-styles.css --write-out '%{http_code}' "$base_url/styles.css" || true)
+            if [ "$index_status" = "200" ] \
+              && [ "$app_status" = "200" ] \
+              && [ "$config_status" = "200" ] \
+              && [ "$styles_status" = "200" ] \
+              && grep -q "ScaleUp JobPilot" /tmp/jobpilot.html \
+              && grep -q "async function signUp" /tmp/jobpilot-app.js \
+              && grep -q "function hasActiveAccess" /tmp/jobpilot-app.js \
+              && grep -q "SUPABASE_URL" /tmp/jobpilot-config.js \
+              && grep -q "\\.auth-card" /tmp/jobpilot-styles.css; then
+              echo "Live verification passed: HTML and all required application assets returned HTTP 200 with expected markers."
               exit 0
             fi
-            echo "Attempt $attempt/12: status=$status; waiting for Pages propagation."
+            echo "Attempt $attempt/12: index=$index_status app=$app_status config=$config_status styles=$styles_status; waiting for Pages propagation."
             sleep 10
           done
-          echo "Live verification failed for $PAGE_URL"
+          echo "Live verification failed: one or more required application resources were unavailable or invalid."
           exit 1
