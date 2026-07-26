@@ -17,21 +17,14 @@ https://ahmedhamdy687-prog.github.io/ScaleUp-JobPilot/
 Current verified status as of 2026-07-26:
 
 - The repository is public.
-- The route returns GitHub Pages `404 Site not found`.
-- Pages deployment is not live.
+- GitHub Pages is enabled with **GitHub Actions** as its source.
+- The public route returns the `ScaleUp JobPilot` application.
+- The deployed HTML, JavaScript, configuration, and stylesheet are
+  independently required to return HTTP `200` with expected application
+  markers after every deployment.
 
-GitHub does not allow `actions/configure-pages` to enable a site with the
-workflow's default `GITHUB_TOKEN`. An administrator must enable Pages once:
-
-1. Open repository **Settings -> Pages**.
-2. Under **Build and deployment**, select **GitHub Actions** as the source.
-3. Open **Actions -> Deploy static app to GitHub Pages**.
-4. Run the workflow on `main`.
-5. Require the `Verify public deployment` step to pass before reporting the
-   application as live.
-
-The workflow intentionally verifies HTTP `200` and the `ScaleUp JobPilot`
-application marker after deployment.
+The Pages workflow fails closed when the route or any required production asset
+is missing, stale, or invalid.
 
 ## Supabase
 
