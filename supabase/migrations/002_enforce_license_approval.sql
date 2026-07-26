@@ -9,7 +9,7 @@ security invoker
 set search_path = public
 as $$
 begin
-  if auth.role() = 'authenticated' then
+  if current_user = 'authenticated' then
     if tg_op = 'INSERT' then
       new.plan := 'trial';
       new.license_status := 'trial';
