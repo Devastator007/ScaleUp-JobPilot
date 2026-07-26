@@ -11,7 +11,8 @@ const migration = read("supabase/migrations/002_enforce_license_approval.sql");
 const app = read("app.js");
 
 test("browser profile creation cannot activate a paid license", () => {
-  assert.match(migration, /if auth\.role\(\) = 'authenticated'/);
+  assert.match(migration, /if current_user = 'authenticated'/);
+  assert.doesNotMatch(migration, /auth\.role\(/);
   assert.match(migration, /new\.plan := 'trial'/);
   assert.match(migration, /new\.license_status := 'trial'/);
   assert.match(migration, /before insert or update on public\.profiles/);
