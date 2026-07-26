@@ -35,6 +35,7 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -43,3 +44,22 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify public deployment
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          test -n "$PAGE_URL"
+          for attempt in {1..12}; do
+            status=$(curl --silent --show-error --location --output /tmp/jobpilot.html --write-out '%{http_code}' "$PAGE_URL" || true)
+            if [ "$status" = "200" ] && grep -q "ScaleUp JobPilot" /tmp/jobpilot.html; then
+              echo "Live verification passed: $PAGE_URL returned HTTP 200 with the expected application marker."
+              exit 0
+            fi
+            echo "Attempt $attempt/12: status=$status; waiting for Pages propagation."
+            sleep 10
+          done
+          echo "Live verification failed for $PAGE_URL"
+          exit 1
