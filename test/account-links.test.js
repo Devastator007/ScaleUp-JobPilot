@@ -20,14 +20,14 @@ test("supports Google OAuth sign-in and identity linking", () => {
 });
 
 test("distinguishes verified email from an unconfirmed address", () => {
-  assert.match(script, /Boolean\\(user\\.email_confirmed_at\\)/);
+  assert.match(script, /Boolean\(user\.email_confirmed_at\)/);
   assert.match(script, /Confirmation required/);
   assert.match(script, /data-resend-confirmation/);
-  assert.match(script, /client\\.auth\\.resend\\(\\{/);
-  assert.match(script, /type:\\s*"signup"/);
-  assert.match(script, /emailRedirectTo:\\s*redirectUrl\\(\\)/);
+  assert.match(script, /client\.auth\.resend\(\{/);
+  assert.match(script, /type:\s*"signup"/);
+  assert.match(script, /emailRedirectTo:\s*redirectUrl\(\)/);
   assert.match(script, /aria-live="polite"/);
-  assert.doesNotMatch(script, /emailLinked \\? "Connected"/);
+  assert.doesNotMatch(script, /emailLinked \? "Connected"/);
 });
 
 test("does not request or store job-board passwords", () => {
@@ -42,5 +42,6 @@ test("Pages publishes and live-verifies account-linking assets", () => {
   assert.match(workflow, /account_styles_status=.*account-links\.css/);
   assert.match(workflow, /grep -q "signInWithOAuth".*jobpilot-account-links\.js/);
   assert.match(workflow, /grep -q "linkIdentity".*jobpilot-account-links\.js/);
+  assert.match(workflow, /grep -q "client\.auth\.resend".*jobpilot-account-links\.js/);
   assert.match(workflow, /grep -q "\\\\.connected-accounts-panel".*jobpilot-account-links\.css/);
 });
