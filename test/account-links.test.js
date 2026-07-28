@@ -19,6 +19,17 @@ test("supports Google OAuth sign-in and identity linking", () => {
   assert.match(script, /redirectTo:\s*redirectUrl\(\)/);
 });
 
+test("distinguishes verified email from an unconfirmed address", () => {
+  assert.match(script, /Boolean\\(user\\.email_confirmed_at\\)/);
+  assert.match(script, /Confirmation required/);
+  assert.match(script, /data-resend-confirmation/);
+  assert.match(script, /client\\.auth\\.resend\\(\\{/);
+  assert.match(script, /type:\\s*"signup"/);
+  assert.match(script, /emailRedirectTo:\\s*redirectUrl\\(\\)/);
+  assert.match(script, /aria-live="polite"/);
+  assert.doesNotMatch(script, /emailLinked \\? "Connected"/);
+});
+
 test("does not request or store job-board passwords", () => {
   assert.match(script, /does not collect or store job-board passwords/i);
   assert.doesNotMatch(script, /linkedin_password|indeed_password|job_board_password/i);
