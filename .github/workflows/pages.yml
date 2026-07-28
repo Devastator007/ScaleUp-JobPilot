@@ -71,6 +71,7 @@ jobs:
               && grep -q "\\.auth-card" /tmp/jobpilot-styles.css \
               && grep -q "signInWithOAuth" /tmp/jobpilot-account-links.js \
               && grep -q "linkIdentity" /tmp/jobpilot-account-links.js \
+              && grep -q "client.auth.resend" /tmp/jobpilot-account-links.js \\
               && grep -q "\\.connected-accounts-panel" /tmp/jobpilot-account-links.css; then
               echo "Live verification passed: HTML and all required application assets returned HTTP 200 with expected markers."
               exit 0
