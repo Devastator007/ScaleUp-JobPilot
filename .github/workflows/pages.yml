@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p _site
-          cp index.html styles.css app.js config.js _site/
+          cp index.html styles.css app.js config.js account-links.js account-links.css _site/
           touch _site/.nojekyll
 
       - name: Setup Pages
@@ -56,19 +56,26 @@ jobs:
             app_status=$(curl --silent --show-error --location --output /tmp/jobpilot-app.js --write-out '%{http_code}' "$base_url/app.js" || true)
             config_status=$(curl --silent --show-error --location --output /tmp/jobpilot-config.js --write-out '%{http_code}' "$base_url/config.js" || true)
             styles_status=$(curl --silent --show-error --location --output /tmp/jobpilot-styles.css --write-out '%{http_code}' "$base_url/styles.css" || true)
+            account_script_status=$(curl --silent --show-error --location --output /tmp/jobpilot-account-links.js --write-out '%{http_code}' "$base_url/account-links.js" || true)
+            account_styles_status=$(curl --silent --show-error --location --output /tmp/jobpilot-account-links.css --write-out '%{http_code}' "$base_url/account-links.css" || true)
             if [ "$index_status" = "200" ] \
               && [ "$app_status" = "200" ] \
               && [ "$config_status" = "200" ] \
               && [ "$styles_status" = "200" ] \
+              && [ "$account_script_status" = "200" ] \
+              && [ "$account_styles_status" = "200" ] \
               && grep -q "ScaleUp JobPilot" /tmp/jobpilot.html \
               && grep -q "async function signUp" /tmp/jobpilot-app.js \
               && grep -q "function hasActiveAccess" /tmp/jobpilot-app.js \
               && grep -q "SUPABASE_URL" /tmp/jobpilot-config.js \
-              && grep -q "\\.auth-card" /tmp/jobpilot-styles.css; then
+              && grep -q "\\.auth-card" /tmp/jobpilot-styles.css \
+              && grep -q "signInWithOAuth" /tmp/jobpilot-account-links.js \
+              && grep -q "linkIdentity" /tmp/jobpilot-account-links.js \
+              && grep -q "\\.connected-accounts-panel" /tmp/jobpilot-account-links.css; then
               echo "Live verification passed: HTML and all required application assets returned HTTP 200 with expected markers."
               exit 0
             fi
-            echo "Attempt $attempt/12: index=$index_status app=$app_status config=$config_status styles=$styles_status; waiting for Pages propagation."
+            echo "Attempt $attempt/12: index=$index_status app=$app_status config=$config_status styles=$styles_status account_script=$account_script_status account_styles=$account_styles_status; waiting for Pages propagation."
             sleep 10
           done
           echo "Live verification failed: one or more required application resources were unavailable or invalid."
