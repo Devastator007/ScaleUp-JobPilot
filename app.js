@@ -247,7 +247,7 @@ function passwordPolicyError(password) {
   if (value.length < 12 || value.length > 128) {
     return "Password must be 12 to 128 characters.";
   }
-  if (!/\\p{L}/u.test(value) || !/\\p{N}/u.test(value)) {
+  if (!/\p{L}/u.test(value) || !/\p{N}/u.test(value)) {
     return "Password must include at least one letter and one number.";
   }
   return "";
