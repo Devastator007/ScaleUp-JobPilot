@@ -197,6 +197,7 @@ function setAuthMode(mode, message = "") {
   els.authPassword.required = needsPassword;
   els.authConfirmWrap.classList.toggle("hidden", !needsConfirm);
   els.authConfirmPassword.required = needsConfirm;
+  applyPasswordConstraints(mode);
   els.authSubmitBtn.textContent =
     mode === "signup" ? "Create account" :
     mode === "reset" ? "Send reset email" :
@@ -228,9 +229,34 @@ function resetPasswordVisibility() {
   });
 }
 
+function applyPasswordConstraints(mode) {
+  const requiresNewPassword = mode === "signup" || mode === "recovery";
+  [els.authPassword, els.authConfirmPassword].forEach((input) => {
+    if (requiresNewPassword) {
+      input.setAttribute("minlength", "12");
+      input.setAttribute("maxlength", "128");
+    } else {
+      input.removeAttribute("minlength");
+      input.removeAttribute("maxlength");
+    }
+  });
+}
+
+function passwordPolicyError(password) {
+  const value = String(password ?? "");
+  if (value.length < 12 || value.length > 128) {
+    return "Password must be 12 to 128 characters.";
+  }
+  if (!/\p{L}/u.test(value) || !/\p{N}/u.test(value)) {
+    return "Password must include at least one letter and one number.";
+  }
+  return "";
+}
+
 function passwordsMatch() {
-  if (els.authPassword.value.length < 6) {
-    showAuthMessage("Password must be at least 6 characters.", "error");
+  const policyError = passwordPolicyError(els.authPassword.value);
+  if (policyError) {
+    showAuthMessage(policyError, "error");
     return false;
   }
   if (els.authPassword.value !== els.authConfirmPassword.value) {
