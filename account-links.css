@@ -37,6 +37,14 @@
   padding: 14px 0;
 }
 
+.connected-account-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .connected-account-row:last-of-type {
   border-bottom: 1px solid var(--border, #e4e7ec);
   margin-bottom: 16px;
@@ -48,7 +56,13 @@
     flex-direction: column;
   }
 
+  .connected-account-actions,
   .connected-account-row .button {
     width: 100%;
+  }
+
+  .connected-account-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
