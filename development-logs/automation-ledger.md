@@ -157,7 +157,7 @@
 ## 2026-07-28T11:23:07+03:00 — ScaleUp Hourly Development — Recovery cycle 6/6
 
 - **Automation name:** ScaleUp Hourly Development.
-- **Run label:** Recovery cycle 6/6.
+- **Run label:** final recovery enhancement.
 - **Repositories inspected:** `ahmedhamdy687-prog/scaleuptech`, `ahmedhamdy687-prog/ScaleUp-JobPilot`, `ahmedhamdy687-prog/scaleuptech-CRM`, `ahmedhamdy687-prog/scalecx`, and `ahmedhamdy687-prog/pharmacy-manager`.
 - **Repository findings:** refreshed current `main` heads were website `2e94c3902ed99fb317e1856fcdd65bcb76fd7364`, JobPilot `38d75a9b6b43c65d4f7237a90f4ee8115c47d196`, CRM `0aa2866875ebc45bb0c37cdc3d6b7cd456876258`, ScaleCX `0c7466cbfc8acb9e94bfb47e34c1b133be832a82`, and Pharmacy Manager `60ce183628add4c4c94697509762cc3a22924ae4`. Open issues were zero across all five. Website PR #45 was the only pre-existing open PR and concerns a non-overlapping integration guide. Historical branches were inspected; none overlapped this JobPilot password-policy scope. Current-head pull-request workflow lookups returned no attached runs before selection.
 - **Selected repository and branch:** `ahmedhamdy687-prog/ScaleUp-JobPilot` — `automation/recovery-6-jobpilot-password-policy-20260728`, created from exact current `main`.
