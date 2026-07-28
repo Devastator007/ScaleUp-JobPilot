@@ -528,7 +528,64 @@ function renderBilling() {
         ? `<div class="notice-box"><strong>Setup status</strong><p>${hasResume() ? "CV is ready for matching." : "Upload or paste CV text before running search."} ${state.searches.length ? "Search setup is ready." : "Create at least one search/apply setup."}</p></div>`
         : `<div class="notice-box"><strong>Activation required</strong><p>JobPilot access starts after manual InstaPay or bank-transfer verification. Contact ${escapeHtml(cfg.SUPPORT_EMAIL || "support@scaleuptech.org")} with your transfer reference for approval or renewal.</p></div>`}
     </section>
+    <section class="panel" style="margin-top:16px">
+      <h2>Account security</h2>
+      <form id="account-password-form" class="form-grid">
+        <label>New password
+          <div class="password-field">
+            <input id="account-new-password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required />
+            <button class="password-toggle" type="button" data-password-toggle="account-new-password" aria-controls="account-new-password" aria-label="Show new password" aria-pressed="false">Show</button>
+          </div>
+        </label>
+        <label>Confirm new password
+          <div class="password-field">
+            <input id="account-confirm-password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required />
+            <button class="password-toggle" type="button" data-password-toggle="account-confirm-password" aria-controls="account-confirm-password" aria-label="Show confirmed password" aria-pressed="false">Show</button>
+          </div>
+        </label>
+        <button class="button primary" type="submit" id="account-password-submit">Change password</button>
+        <p id="account-password-message" class="form-message" aria-live="polite"></p>
+      </form>
+      <p class="muted small">Use 12–128 characters with at least one letter and one number. Existing sign-in passwords remain valid until you complete this change.</p>
+    </section>
   `;
+}
+
+async function changeAccountPassword(event) {
+  event.preventDefault();
+  const password = document.getElementById("account-new-password");
+  const confirmation = document.getElementById("account-confirm-password");
+  const submit = document.getElementById("account-password-submit");
+  const message = document.getElementById("account-password-message");
+  const policyError = passwordPolicyError(password.value);
+  message.classList.remove("success");
+  if (policyError) {
+    message.textContent = policyError;
+    return;
+  }
+  if (password.value !== confirmation.value) {
+    message.textContent = "Passwords do not match.";
+    return;
+  }
+
+  submit.disabled = true;
+  const { error } = await supabaseClient.auth.updateUser({ password: password.value });
+  submit.disabled = false;
+  if (error) {
+    message.textContent = error.message;
+    return;
+  }
+
+  password.value = "";
+  confirmation.value = "";
+  document.querySelectorAll("#account-password-form [data-password-toggle]").forEach((button) => {
+    const input = document.getElementById(button.dataset.passwordToggle);
+    if (input) input.type = "password";
+    button.textContent = "Show";
+    button.setAttribute("aria-pressed", "false");
+  });
+  message.textContent = "Password changed successfully.";
+  message.classList.add("success");
 }
 
 function metric(label, value) {
@@ -605,6 +662,11 @@ function bindDynamicActions() {
   });
   document.querySelectorAll("[data-clear-activity]").forEach((button) => {
     button.addEventListener("click", clearActivity);
+  });
+  const accountPasswordForm = document.getElementById("account-password-form");
+  if (accountPasswordForm) accountPasswordForm.addEventListener("submit", changeAccountPassword);
+  document.querySelectorAll("#account-password-form [data-password-toggle]").forEach((button) => {
+    button.addEventListener("click", () => togglePasswordVisibility(button));
   });
 }
 
