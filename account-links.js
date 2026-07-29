@@ -11,7 +11,7 @@
   });
 
   function redirectUrl() {
-    return `${window.location.origin}${window.location.pathname}`;
+    return "https://scaleuptech.org/app/jobpilot/";
   }
 
   function mountGoogleSignIn() {

@@ -16,6 +16,7 @@ test("supports Google OAuth sign-in and identity linking", () => {
   assert.match(script, /signInWithOAuth/);
   assert.match(script, /linkIdentity/);
   assert.match(script, /provider:\s*["']google["']/);
+  assert.match(script, /return "https:\/\/scaleuptech\.org\/app\/jobpilot\/"/);
   assert.match(script, /redirectTo:\s*redirectUrl\(\)/);
 });
 
