@@ -9,8 +9,10 @@ const script = fs.readFileSync(path.join(root, "app.js"), "utf8");
 
 test("signup success does not falsely guarantee account creation or email delivery", () => {
   assert.doesNotMatch(script, /Account created\. Please check your email/);
-  assert.match(script, /If this address needs confirmation/);
-  assert.match(script, /Already registered\? Sign in or reset your password/);
+  assert.match(script, /data\.user\?\.identities/);
+  assert.match(script, /data\.user\.identities\.length === 0/);
+  assert.match(script, /An account already exists for this email/);
+  assert.match(script, /Registration received\. Check your inbox and spam folder/);
 });
 
 test("signed-out users can safely request another confirmation email", () => {

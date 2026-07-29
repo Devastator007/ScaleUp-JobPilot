@@ -133,7 +133,7 @@ async function signIn() {
 async function signUp() {
   clearAuthMessage();
   if (!passwordsMatch()) return;
-  const { error } = await supabaseClient.auth.signUp({
+  const { data, error } = await supabaseClient.auth.signUp({
     email: els.authEmail.value.trim(),
     password: els.authPassword.value,
     options: { emailRedirectTo: authRedirectUrl() }
@@ -142,9 +142,12 @@ async function signUp() {
     showAuthMessage(error.message, "error");
     return;
   }
+  const isExistingAccount = Array.isArray(data.user?.identities) && data.user.identities.length === 0;
   setAuthMode("signin");
   showAuthMessage(
-    "If this address needs confirmation, an email has been requested. Already registered? Sign in or reset your password.",
+    isExistingAccount
+      ? "An account already exists for this email. Sign in or reset your password."
+      : "Registration received. Check your inbox and spam folder for the confirmation email before signing in.",
     "success"
   );
 }
