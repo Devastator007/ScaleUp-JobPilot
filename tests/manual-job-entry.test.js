@@ -16,30 +16,17 @@ test("live app uses the authenticated search function instead of unavailable PHP
   assert.doesNotMatch(html, />Run search</);
 });
 
-test("paid workspace provides a complete manual job entry form", () => {
-  for (const id of [
-    "job-form",
-    "job-title",
-    "job-company",
-    "job-platform",
-    "job-status",
-    "job-location",
-    "job-url",
-    "job-notes",
-    "job-score",
-    "job-form-result"
-  ]) {
-    assert.match(app, new RegExp(`id="${id}"`));
-  }
-  assert.match(app, /supabaseClient\.from\("jobs"\)\.insert\(payload\)/);
-  assert.match(app, /user_id: state\.user\.id/);
-  assert.match(app, /match_score: parseNullableInt/);
-  assert.match(app, /aria-live="polite"/);
+test("Jobs contains discovered opportunities without duplicate manual entry", () => {
+  assert.match(app, /<h2>Discovered jobs<\/h2>/);
+  assert.match(app, /Complete Candidate Setup, then use Find Jobs/);
+  assert.doesNotMatch(app, /id="job-form"/);
+  assert.doesNotMatch(app, /function saveJob\(/);
+  assert.doesNotMatch(app, /data-add-job/);
+  assert.doesNotMatch(html, /id="new-job-btn"/);
+  assert.doesNotMatch(html, />Add job</);
 });
 
-test("manual entry remains entitlement-gated and application JavaScript parses", () => {
-  assert.match(app, /function openJobEntry\(\)[\s\S]*if \(!hasActiveAccess\(\)\)/);
-  assert.match(app, /els\.newJobBtn\.addEventListener\("click", openJobEntry\)/);
-  assert.match(html, />Add job</);
+test("discovered Jobs view remains entitlement-gated and JavaScript parses", () => {
+  assert.match(app, /const disabled = !active && button\.dataset\.view !== "billing"/);
   new vm.Script(app);
 });

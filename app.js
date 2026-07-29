@@ -33,7 +33,6 @@ const els = {
   forgotPasswordBtn: document.getElementById("forgot-password-btn"),
   resendConfirmationBtn: document.getElementById("resend-confirmation-btn"),
   signOutBtn: document.getElementById("sign-out-btn"),
-  newJobBtn: document.getElementById("new-job-btn"),
   viewTitle: document.getElementById("view-title"),
   viewSubtitle: document.getElementById("view-subtitle"),
   planLabel: document.getElementById("plan-label"),
@@ -90,7 +89,6 @@ function bindEvents() {
     button.addEventListener("click", () => togglePasswordVisibility(button));
   });
   els.signOutBtn.addEventListener("click", signOut);
-  els.newJobBtn.addEventListener("click", openJobEntry);
 }
 
 async function refresh() {
@@ -110,7 +108,6 @@ function showAuth(message) {
   els.authView.classList.remove("hidden");
   els.appView.classList.add("hidden");
   els.signOutBtn.classList.add("hidden");
-  els.newJobBtn.classList.add("hidden");
   els.authMessage.textContent = message || "";
 }
 
@@ -118,7 +115,6 @@ function showApp() {
   els.authView.classList.add("hidden");
   els.appView.classList.remove("hidden");
   els.signOutBtn.classList.remove("hidden");
-  els.newJobBtn.classList.remove("hidden");
 }
 
 async function signIn() {
@@ -361,7 +357,7 @@ function setView(view) {
   const meta = {
     dashboard: ["Dashboard", "Organize target roles, record opportunities, and manage applications."],
     pipeline: ["Pipeline", "Track applications from discovered to offer."],
-    jobs: ["Jobs", "Record opportunities and manage their application status."],
+    jobs: ["Jobs", "Review discovered opportunities and manage their application status."],
     searches: ["Find Jobs", "Run discovery using the criteria saved once in Candidate Setup."],
     profile: ["Candidate Setup", "Save your CV, job criteria, platforms, and reusable application answers."],
     billing: ["Account", "Your account access and product setup status."]
@@ -406,9 +402,6 @@ function renderDashboard() {
           <tr><td>Average CV fit score</td><td>${avgScore ? `${avgScore}%` : "No scores yet"}</td></tr>
           <tr><td>Best platform</td><td>${bestPlatform()}</td></tr>
         </table>
-        <div class="panel-actions">
-          <button class="button primary" data-add-job>Add job</button>
-        </div>
         <p class="muted small">Keep one Candidate Setup, run Find Jobs, then review outside-portal actions in the Jobs tab.</p>
       </section>
       <section class="panel">
@@ -443,37 +436,17 @@ function renderPipeline() {
 function renderJobs() {
   document.getElementById("jobs-view").innerHTML = `
     <section class="panel">
-      <h2>Add a job</h2>
-      <form id="job-form" class="form-grid">
-        <label>Role title<input id="job-title" required placeholder="Customer Success Manager" /></label>
-        <label>Company<input id="job-company" placeholder="Company name" /></label>
-        <label>Platform<input id="job-platform" placeholder="LinkedIn, Wuzzuf, referral" /></label>
-        <label>Location<input id="job-location" placeholder="Cairo, Remote" /></label>
-        <label>Status
-          <select id="job-status">
-            ${statusOrder.map((status) => `<option value="${status}">${status}</option>`).join("")}
-          </select>
-        </label>
-        <label>CV fit score %<input id="job-score" type="number" min="0" max="100" placeholder="Optional" /></label>
-        <label style="grid-column:1/-1">Job URL<input id="job-url" type="url" placeholder="https://…" /></label>
-        <label style="grid-column:1/-1">Notes<textarea id="job-notes" rows="4" placeholder="Requirements, contact, next step…"></textarea></label>
-        <button class="button primary" type="submit">Save job</button>
-        <p id="job-form-result" class="form-message" aria-live="polite"></p>
-      </form>
-    </section>
-    <section class="panel">
-      <h2>All jobs</h2>
+      <h2>Discovered jobs</h2>
       ${
         state.jobs.length
           ? `<table class="table">
               <thead><tr><th>Role</th><th>Platform</th><th>Status</th><th>Next action</th><th>Score</th><th></th></tr></thead>
               <tbody>${state.jobs.map(jobRow).join("")}</tbody>
             </table>`
-          : empty("No jobs yet. Add the first opportunity above.")
+          : empty("No jobs found yet. Complete Candidate Setup, then use Find Jobs.")
       }
     </section>
   `;
-  document.getElementById("job-form").addEventListener("submit", saveJob);
 }
 
 function renderSearches() {
@@ -699,9 +672,6 @@ function bestPlatform() {
 }
 
 function bindDynamicActions() {
-  document.querySelectorAll("[data-add-job]").forEach((button) => {
-    button.addEventListener("click", openJobEntry);
-  });
   document.querySelectorAll("[data-edit-search]").forEach((button) => {
     button.addEventListener("click", () => editSearchSetup(button.dataset.editSearch));
   });
@@ -713,15 +683,6 @@ function bindDynamicActions() {
   document.querySelectorAll("#account-password-form [data-password-toggle]").forEach((button) => {
     button.addEventListener("click", () => togglePasswordVisibility(button));
   });
-}
-
-function openJobEntry() {
-  if (!hasActiveAccess()) {
-    setView("billing");
-    return;
-  }
-  setView("jobs");
-  document.getElementById("job-title")?.focus();
 }
 
 function subscriptionExpiresAt() {
@@ -752,7 +713,6 @@ function displayStatus() {
 
 function applyEntitlementState() {
   const active = hasActiveAccess();
-  els.newJobBtn.classList.toggle("hidden", !active);
   document.querySelectorAll(".nav-item").forEach((button) => {
     const disabled = !active && button.dataset.view !== "billing";
     button.disabled = disabled;
@@ -798,32 +758,6 @@ async function saveSearch(event) {
   await loadData();
   renderSearches();
   renderDashboard();
-}
-
-async function saveJob(event) {
-  event.preventDefault();
-  const result = document.getElementById("job-form-result");
-  result.textContent = "";
-  const payload = {
-    user_id: state.user.id,
-    title: document.getElementById("job-title").value.trim(),
-    company: document.getElementById("job-company").value.trim(),
-    platform: document.getElementById("job-platform").value.trim() || "Manual",
-    status: document.getElementById("job-status").value,
-    location: document.getElementById("job-location").value.trim(),
-    url: document.getElementById("job-url").value.trim(),
-    notes: document.getElementById("job-notes").value.trim(),
-    match_score: parseNullableInt(document.getElementById("job-score").value)
-  };
-  const { error } = await supabaseClient.from("jobs").insert(payload);
-  if (error) {
-    result.textContent = error.message;
-    return;
-  }
-  await logEvent("job_added", `Added ${payload.title} at ${payload.company || "an unspecified company"}.`);
-  await loadData();
-  render();
-  document.getElementById("job-form-result").textContent = "Job saved.";
 }
 
 function editSearchSetup(id) {
@@ -951,7 +885,7 @@ function readinessPanel() {
   const steps = [
     ["CV", hasResume(), "Upload or paste CV text"],
     ["Setup", candidateSetupReady(), "Add target role, location, and platforms"],
-    ["Jobs", state.jobs.length > 0, "Add an opportunity"]
+    ["Jobs", state.jobs.length > 0, "Run Find Jobs"]
   ];
   return `<section class="panel readiness-panel"><h2>Setup checklist</h2><div class="checklist">${steps.map(([label, done, text]) => `<div class="check-item ${done ? "done" : ""}"><strong>${label}</strong><span>${text}</span></div>`).join("")}</div></section>`;
 }

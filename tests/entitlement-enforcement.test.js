@@ -36,7 +36,7 @@ test("customer workspace policies require the entitlement function", () => {
 
 test("inactive customers are routed to manual activation instead of the workspace", () => {
   assert.match(app, /if \(!active\) state\.view = "billing"/);
-  assert.match(app, /if \(!hasActiveAccess\(\)\)/);
+  assert.match(app, /state\.view = hasActiveAccess\(\) \? view : "billing"/);
   assert.match(app, /manual InstaPay or bank-transfer verification/);
   assert.match(app, /button\.disabled = disabled/);
 });
