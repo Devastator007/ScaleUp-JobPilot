@@ -18,8 +18,7 @@ alter table public.applications
   add column if not exists answer_pack jsonb not null default '{}'::jsonb;
 
 create unique index if not exists idx_jobs_user_source_key
-  on public.jobs(user_id, source_key)
-  where source_key is not null and source_key <> '';
+  on public.jobs(user_id, source_key);
 create unique index if not exists idx_applications_user_job
   on public.applications(user_id, job_id);
 
