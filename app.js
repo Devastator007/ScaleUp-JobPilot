@@ -362,8 +362,8 @@ function setView(view) {
     dashboard: ["Dashboard", "Organize target roles, record opportunities, and manage applications."],
     pipeline: ["Pipeline", "Track applications from discovered to offer."],
     jobs: ["Jobs", "Record opportunities and manage their application status."],
-    searches: ["Search Plans", "Save target roles, platforms, locations, and review criteria."],
-    profile: ["Candidate Setup", "Upload CV and save the details JobPilot uses to match and apply."],
+    searches: ["Find Jobs", "Run discovery using the criteria saved once in Candidate Setup."],
+    profile: ["Candidate Setup", "Save your CV, job criteria, platforms, and reusable application answers."],
     billing: ["Account", "Your account access and product setup status."]
   };
   els.viewTitle.textContent = meta[state.view][0];
@@ -402,14 +402,14 @@ function renderDashboard() {
         <table class="table">
           <tr><th>Metric</th><th>Value</th></tr>
           <tr><td>CV/profile ready</td><td>${hasResume() ? "Yes" : "Needs CV"}</td></tr>
-          <tr><td>Search setups</td><td>${state.searches.length}</td></tr>
+          <tr><td>Search setup</td><td>${candidateSetupReady() ? "Ready" : "Incomplete"}</td></tr>
           <tr><td>Average CV fit score</td><td>${avgScore ? `${avgScore}%` : "No scores yet"}</td></tr>
           <tr><td>Best platform</td><td>${bestPlatform()}</td></tr>
         </table>
         <div class="panel-actions">
           <button class="button primary" data-add-job>Add job</button>
         </div>
-        <p class="muted small">Use search plans to keep your criteria consistent, then record suitable opportunities and move them through the application pipeline.</p>
+        <p class="muted small">Keep one Candidate Setup, run Find Jobs, then review outside-portal actions in the Jobs tab.</p>
       </section>
       <section class="panel">
         <div class="panel-title-row">
@@ -466,7 +466,7 @@ function renderJobs() {
       ${
         state.jobs.length
           ? `<table class="table">
-              <thead><tr><th>Role</th><th>Platform</th><th>Status</th><th>Score</th><th></th></tr></thead>
+              <thead><tr><th>Role</th><th>Platform</th><th>Status</th><th>Next action</th><th>Score</th><th></th></tr></thead>
               <tbody>${state.jobs.map(jobRow).join("")}</tbody>
             </table>`
           : empty("No jobs yet. Add the first opportunity above.")
@@ -477,49 +477,41 @@ function renderJobs() {
 }
 
 function renderSearches() {
+  const p = state.profile || {};
+  const prefs = profilePreferences();
+  const outsideCount = state.jobs.filter((job) => job.action_status === "candidate_action_required").length;
   document.getElementById("searches-view").innerHTML = `
     <section class="panel">
-        <h2>Create search/apply setup</h2>
-        <form id="search-form" class="form-grid">
-          <input id="search-id" type="hidden" />
-          <label>Target role<input id="search-name" placeholder="Customer Success Manager" required /></label>
-          <label>Platforms<input id="search-platform" placeholder="LinkedIn, Indeed, Wuzzuf, Bayt" /></label>
-          <label>Must-have keywords<input id="search-keywords" placeholder="customer success, SaaS, account management" /></label>
-          <label>Location<input id="search-location" placeholder="Remote, Cairo" /></label>
-          <label>Minimum CV match %<input id="search-min-score" type="number" min="0" max="100" value="70" /></label>
-          <label>Daily apply limit<input id="search-daily-limit" type="number" min="1" max="50" value="10" /></label>
-          <label style="grid-column:1/-1">Exclude words<input id="search-exclusions" placeholder="senior director, unpaid, internship" /></label>
-          <label style="grid-column:1/-1">Application mode
-            <select id="search-mode">
-              <option value="review">Review matches before applying</option>
-              <option value="auto">Prepare applications for jobs above threshold</option>
-            </select>
-          </label>
-        <div class="form-actions">
-          <button class="button primary" type="submit" id="search-save-btn">Save setup</button>
-          <button class="button secondary hidden" type="button" id="search-cancel-edit-btn">Cancel edit</button>
-        </div>
-      </form>
+      <h2>Find jobs for ${escapeHtml(p.target_title || "your target role")}</h2>
+      <p class="muted">Location: ${escapeHtml(p.location || "Not set")} · Platforms: ${escapeHtml((prefs.platforms || []).join(", ") || "Not set")}</p>
+      <p>JobPilot searches supported public feeds, removes duplicate source jobs, and prepares reusable answers from Candidate Setup. A third-party application page is always marked <strong>Candidate action required</strong>; JobPilot does not claim submission on an outside portal.</p>
+      <div class="panel-actions">
+        <button class="button primary" type="button" id="start-search-btn" ${candidateSetupReady() ? "" : "disabled"}>Start search</button>
+        <button class="button secondary" type="button" data-view-profile>Update Candidate Setup</button>
+      </div>
+      <p id="search-run-result" class="form-message" role="status" aria-live="polite"></p>
     </section>
     <section class="panel" style="margin-top:16px">
-      <h2>Search setups</h2>
-      ${
-        state.searches.length
-          ? `<table class="table"><tbody>${state.searches.map(searchRow).join("")}</tbody></table>`
-          : empty("No search setup yet.")
-      }
+      <h2>Search result workflow</h2>
+      <div class="metrics-grid">
+        ${metric("Discovered jobs", state.jobs.length)}
+        ${metric("Candidate action", outsideCount)}
+      </div>
+      <p class="muted small">LinkedIn, Indeed, Wuzzuf, and Bayt remain outside portals unless an approved direct integration is available. Remotive and Arbeitnow are searchable public feeds.</p>
     </section>
   `;
-  document.getElementById("search-form").addEventListener("submit", saveSearch);
-  document.getElementById("search-cancel-edit-btn").addEventListener("click", resetSearchForm);
-  if (state.editingSearchId) populateSearchForm(state.searches.find((item) => item.id === state.editingSearchId));
+  document.getElementById("start-search-btn")?.addEventListener("click", startSearch);
+  document.querySelector("[data-view-profile]")?.addEventListener("click", () => setView("profile"));
 }
 
 function renderProfile() {
   const p = state.profile || {};
+  const prefs = profilePreferences();
+  const answers = p.application_answers || {};
+  const platforms = ["LinkedIn", "Indeed", "Wuzzuf", "Bayt", "Remotive", "Arbeitnow"];
   document.getElementById("profile-view").innerHTML = `
     <section class="panel">
-      <h2>Candidate profile and CV</h2>
+      <h2>Candidate profile, search and apply setup</h2>
       <form id="profile-form" class="form-grid">
         <label>Full name<input id="profile-name" value="${escapeAttr(p.full_name || "")}" /></label>
         <label>Email<input id="profile-email" value="${escapeAttr(p.email || state.user.email || "")}" /></label>
@@ -527,6 +519,31 @@ function renderProfile() {
         <label>Location<input id="profile-location" value="${escapeAttr(p.location || "")}" /></label>
         <label>LinkedIn URL<input id="profile-linkedin" value="${escapeAttr(p.linkedin_url || "")}" /></label>
         <label>Portfolio URL<input id="profile-portfolio" value="${escapeAttr(p.portfolio_url || "")}" /></label>
+        <fieldset class="platform-fieldset" style="grid-column:1/-1">
+          <legend>Platforms to search</legend>
+          <div class="platform-options">
+            ${platforms.map((platform) => `<label><input type="checkbox" name="profile-platform" value="${platform}" ${(prefs.platforms || []).includes(platform) ? "checked" : ""} /> ${platform}</label>`).join("")}
+          </div>
+          <p class="muted small">Remotive and Arbeitnow provide searchable public feeds. Other platforms open as outside-portal candidate actions.</p>
+        </fieldset>
+        <label>Must-have keywords<input id="profile-keywords" value="${escapeAttr(prefs.must_have_keywords || "")}" placeholder="SaaS, customer success" /></label>
+        <label>Exclude keywords<input id="profile-exclusions" value="${escapeAttr(prefs.exclude_keywords || "")}" placeholder="internship, unpaid" /></label>
+        <label>Minimum match %<input id="profile-min-score" type="number" min="0" max="100" value="${Number(prefs.minimum_match_score) || 70}" /></label>
+        <label>Jobs per search<input id="profile-daily-limit" type="number" min="1" max="30" value="${Number(prefs.daily_apply_limit) || 10}" /></label>
+        <label style="grid-column:1/-1">Application mode
+          <select id="profile-application-mode">
+            <option value="review" ${prefs.application_mode !== "auto_prepare" ? "selected" : ""}>Review every match first</option>
+            <option value="auto_prepare" ${prefs.application_mode === "auto_prepare" ? "selected" : ""}>Prepare answers automatically; I submit on outside portals</option>
+          </select>
+        </label>
+        <h3 style="grid-column:1/-1">Reusable application answers</h3>
+        <label>Work authorization<input id="answer-authorization" value="${escapeAttr(answers.work_authorization || "")}" placeholder="Authorized to work in…" /></label>
+        <label>Sponsorship required?<select id="answer-sponsorship"><option value="">Choose</option><option value="No" ${answers.sponsorship_required === "No" ? "selected" : ""}>No</option><option value="Yes" ${answers.sponsorship_required === "Yes" ? "selected" : ""}>Yes</option></select></label>
+        <label>Notice period<input id="answer-notice" value="${escapeAttr(answers.notice_period || "")}" placeholder="30 days" /></label>
+        <label>Salary expectation<input id="answer-salary" value="${escapeAttr(answers.salary_expectation || "")}" placeholder="Optional" /></label>
+        <label>Years of relevant experience<input id="answer-experience" type="number" min="0" max="60" value="${escapeAttr(answers.years_experience || "")}" /></label>
+        <label>Remote preference<input id="answer-remote" value="${escapeAttr(answers.remote_preference || "")}" placeholder="Remote / Hybrid / On-site" /></label>
+        <label style="grid-column:1/-1">General application note<textarea id="answer-note" rows="4" placeholder="Reusable facts JobPilot may use when preparing answers.">${escapeHtml(answers.general_note || "")}</textarea></label>
         <label style="grid-column:1/-1">Upload CV or resume<input id="profile-cv-file" type="file" accept=".txt,.md,.pdf,.doc,.docx" /></label>
         <label style="grid-column:1/-1">CV text used for matching<textarea id="profile-summary" rows="8" placeholder="Paste the CV text here, or upload a TXT/MD resume so JobPilot can read it for matching.">${escapeHtml(p.resume_summary || "")}</textarea></label>
         <div class="notice-box" style="grid-column:1/-1">
@@ -635,8 +652,9 @@ function jobRow(job) {
       <td><strong>${escapeHtml(job.title)}</strong><br><span class="muted small">${escapeHtml(job.company || "")}</span></td>
       <td>${escapeHtml(job.platform || "Imported")}</td>
       <td><span class="badge ${escapeAttr(job.status)}">${escapeHtml(job.status)}</span></td>
+      <td><span class="badge action-${escapeAttr(job.action_status || "review")}">${escapeHtml(titleCase(job.action_status || "review"))}</span></td>
       <td>${job.match_score ?? "-"}</td>
-      <td>${job.url ? `<a class="button ghost" href="${escapeAttr(job.url)}" target="_blank" rel="noreferrer">Open</a>` : ""}</td>
+      <td>${job.url ? `<a class="button ghost" href="${escapeAttr(job.url)}" target="_blank" rel="noopener noreferrer">Open outside portal</a>` : ""}</td>
     </tr>
   `;
 }
@@ -878,7 +896,24 @@ async function saveProfile(event) {
     location: document.getElementById("profile-location").value.trim(),
     linkedin_url: document.getElementById("profile-linkedin").value.trim(),
     portfolio_url: document.getElementById("profile-portfolio").value.trim(),
-    resume_summary: document.getElementById("profile-summary").value.trim()
+    resume_summary: document.getElementById("profile-summary").value.trim(),
+    job_preferences: {
+      platforms: [...document.querySelectorAll('input[name="profile-platform"]:checked')].map((input) => input.value),
+      must_have_keywords: document.getElementById("profile-keywords").value.trim(),
+      exclude_keywords: document.getElementById("profile-exclusions").value.trim(),
+      minimum_match_score: Number(document.getElementById("profile-min-score").value) || 70,
+      daily_apply_limit: Number(document.getElementById("profile-daily-limit").value) || 10,
+      application_mode: document.getElementById("profile-application-mode").value
+    },
+    application_answers: {
+      work_authorization: document.getElementById("answer-authorization").value.trim(),
+      sponsorship_required: document.getElementById("answer-sponsorship").value,
+      notice_period: document.getElementById("answer-notice").value.trim(),
+      salary_expectation: document.getElementById("answer-salary").value.trim(),
+      years_experience: document.getElementById("answer-experience").value.trim(),
+      remote_preference: document.getElementById("answer-remote").value.trim(),
+      general_note: document.getElementById("answer-note").value.trim()
+    }
   };
   const { data, error } = await supabaseClient
     .from("profiles")
@@ -915,10 +950,52 @@ function hasResume() {
 function readinessPanel() {
   const steps = [
     ["CV", hasResume(), "Upload or paste CV text"],
-    ["Search", state.searches.length > 0, "Create search/apply setup"],
+    ["Setup", candidateSetupReady(), "Add target role, location, and platforms"],
     ["Jobs", state.jobs.length > 0, "Add an opportunity"]
   ];
   return `<section class="panel readiness-panel"><h2>Setup checklist</h2><div class="checklist">${steps.map(([label, done, text]) => `<div class="check-item ${done ? "done" : ""}"><strong>${label}</strong><span>${text}</span></div>`).join("")}</div></section>`;
+}
+
+function profilePreferences() {
+  return state.profile?.job_preferences || {
+    platforms: [],
+    must_have_keywords: "",
+    exclude_keywords: "",
+    minimum_match_score: 70,
+    daily_apply_limit: 10,
+    application_mode: "review"
+  };
+}
+
+function candidateSetupReady() {
+  const prefs = profilePreferences();
+  return Boolean(
+    state.profile?.target_title?.trim()
+    && state.profile?.location?.trim()
+    && hasResume()
+    && Array.isArray(prefs.platforms)
+    && prefs.platforms.length
+  );
+}
+
+async function startSearch() {
+  const button = document.getElementById("start-search-btn");
+  const result = document.getElementById("search-run-result");
+  button.disabled = true;
+  result.textContent = "Searching supported job feeds and removing duplicates…";
+  result.classList.remove("success");
+  const { data, error } = await supabaseClient.functions.invoke("search-jobs", { body: {} });
+  if (error) {
+    result.textContent = error.message;
+    button.disabled = false;
+    return;
+  }
+  await logEvent("job_search_run", `Search found ${data.found || 0} jobs and added ${data.added || 0} new opportunities.`);
+  await loadData();
+  render();
+  const next = document.getElementById("search-run-result");
+  next.textContent = `${data.message} Found ${data.found || 0}; added ${data.added || 0} new jobs.`;
+  next.classList.add("success");
 }
 
 function titleCase(value) {

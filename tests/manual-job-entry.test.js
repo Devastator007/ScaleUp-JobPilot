@@ -10,9 +10,9 @@ const root = path.resolve(__dirname, "..");
 const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
-test("live static app no longer calls the unavailable PHP search endpoint", () => {
+test("live app uses the authenticated search function instead of unavailable PHP", () => {
   assert.doesNotMatch(app, /jobpilot-search\.php/);
-  assert.doesNotMatch(app, /runOnlineSearch|startSearchRun|data-start-run/);
+  assert.match(app, /supabaseClient\.functions\.invoke\("search-jobs"/);
   assert.doesNotMatch(html, />Run search</);
 });
 
