@@ -1,0 +1,185 @@
+"use strict";
+
+if (isTrustedJobPilotPage()) {
+  document.addEventListener("jobpilot-sync-candidate", () => {
+    const bridge = document.getElementById("jobpilot-extension-payload");
+    if (!bridge?.textContent) return;
+    try {
+      const candidateSetup = JSON.parse(bridge.textContent);
+      chrome.storage.local.set({ candidateSetup });
+    } catch {
+      // Invalid bridge data is ignored rather than stored.
+    }
+  });
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== "jobpilot:fill") return false;
+  fillApplication(Boolean(message.submit)).then(sendResponse);
+  return true;
+});
+
+async function fillApplication(shouldSubmit) {
+  const { candidateSetup } = await chrome.storage.local.get("candidateSetup");
+  if (!candidateSetup?.candidate) {
+    return { message: "No candidate setup is synced." };
+  }
+
+  const fields = [...document.querySelectorAll("input, textarea, select")]
+    .filter(isFillable);
+  let filled = 0;
+  const unresolved = [];
+  const blockers = detectBlockers();
+
+  for (const field of fields) {
+    const question = fieldQuestion(field);
+    const answer = resolveAnswer(question, field, candidateSetup);
+    if (answer === null || answer === "") {
+      if (field.required && !field.value) unresolved.push(question || field.name || "Required field");
+      continue;
+    }
+    if (applyAnswer(field, answer)) filled += 1;
+  }
+
+  let submitted = false;
+  if (shouldSubmit && !blockers.length && !unresolved.length) {
+    const submit = findSubmitButton();
+    if (submit) {
+      submit.click();
+      submitted = true;
+    } else {
+      blockers.push("No unambiguous submit button was found");
+    }
+  }
+
+  const parts = [`Filled ${filled} field${filled === 1 ? "" : "s"}.`];
+  if (unresolved.length) parts.push(`Needs answers: ${unique(unresolved).slice(0, 8).join("; ")}.`);
+  if (blockers.length) parts.push(`Candidate action: ${unique(blockers).join("; ")}.`);
+  if (submitted) parts.push("Submission button clicked after your explicit approval.");
+  else if (shouldSubmit) parts.push("Not submitted.");
+  else parts.push("Review the answers before submitting.");
+  return { filled, unresolved, blockers, submitted, message: parts.join("\n") };
+}
+
+function isFillable(field) {
+  if (field.disabled || field.readOnly || field.closest("[hidden]")) return false;
+  const type = String(field.type || "").toLowerCase();
+  return !["hidden", "password", "submit", "button", "reset", "image", "file"].includes(type);
+}
+
+function fieldQuestion(field) {
+  const labels = field.labels ? [...field.labels].map((label) => label.innerText) : [];
+  const labelledBy = String(field.getAttribute("aria-labelledby") || "")
+    .split(/\s+/)
+    .map((id) => document.getElementById(id)?.innerText || "");
+  const nearby = field.closest("label, fieldset, [role='group'], .form-group, .field")?.innerText || "";
+  return [
+    ...labels,
+    ...labelledBy,
+    field.getAttribute("aria-label"),
+    field.placeholder,
+    field.name,
+    nearby.slice(0, 300)
+  ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+}
+
+function resolveAnswer(question, field, setup) {
+  const q = question.toLowerCase();
+  const c = setup.candidate || {};
+  const a = setup.answers || {};
+  const rules = [
+    [/first.?name/, firstName(c.full_name)],
+    [/last.?name|surname|family.?name/, lastName(c.full_name)],
+    [/full.?name|candidate.?name|your.?name/, c.full_name],
+    [/e-?mail/, c.email],
+    [/phone|mobile|telephone/, a.phone],
+    [/linkedin/, c.linkedin_url],
+    [/portfolio|website|personal.?site/, c.portfolio_url],
+    [/current.?location|city|country|location/, c.location],
+    [/desired.?role|target.?title|position.?seeking/, c.target_title],
+    [/work.?authori[sz]ation|authorized to work/, a.work_authorization],
+    [/sponsor|visa/, a.sponsorship_required],
+    [/notice|available.?to.?start|start.?date/, a.notice_period],
+    [/salary|compensation|expected.?pay/, a.salary_expectation],
+    [/years?.*(experience)|experience.*years?/, a.years_experience],
+    [/remote|hybrid|on.?site/, a.remote_preference],
+    [/cover.?letter|why.*(role|company|join|interested)|additional.?information|summary/, a.general_note || excerpt(c.resume_summary)]
+  ];
+  for (const [pattern, value] of rules) {
+    if (pattern.test(q) && value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  if (field.tagName === "SELECT" && /yes|no|agree|consent|terms|privacy/.test(q)) return null;
+  return null;
+}
+
+function applyAnswer(field, answer) {
+  const tag = field.tagName;
+  const type = String(field.type || "").toLowerCase();
+  if (type === "checkbox" || type === "radio") return false;
+  if (tag === "SELECT") {
+    const option = [...field.options].find((item) => normalize(item.textContent).includes(normalize(answer)));
+    if (!option) return false;
+    field.value = option.value;
+  } else {
+    setNativeValue(field, answer);
+  }
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function setNativeValue(field, value) {
+  const prototype = field instanceof HTMLTextAreaElement
+    ? HTMLTextAreaElement.prototype
+    : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+  if (setter) setter.call(field, value);
+  else field.value = value;
+}
+
+function detectBlockers() {
+  const text = document.body.innerText.toLowerCase();
+  const blockers = [];
+  if (document.querySelector("iframe[src*='captcha'], .g-recaptcha, [data-sitekey]") || /captcha/.test(text)) blockers.push("CAPTCHA");
+  if (/assessment|coding test|personality test|video interview/.test(text)) blockers.push("Assessment");
+  if (document.querySelector("input[type='file']")) blockers.push("CV/file upload must be confirmed manually");
+  if (/consent|terms and conditions|privacy policy|certify that/.test(text)) blockers.push("Consent or declaration requires review");
+  return blockers;
+}
+
+function findSubmitButton() {
+  const candidates = [...document.querySelectorAll("button, input[type='submit']")]
+    .filter((item) => !item.disabled && item.offsetParent !== null)
+    .filter((item) => /submit|send application|apply now|complete application/i.test(item.innerText || item.value || ""));
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function firstName(name = "") {
+  return name.trim().split(/\s+/)[0] || "";
+}
+
+function lastName(name = "") {
+  return name.trim().split(/\s+/).slice(1).join(" ");
+}
+
+function excerpt(value = "") {
+  return value.replace(/\s+/g, " ").trim().slice(0, 1200);
+}
+
+function normalize(value = "") {
+  return String(value).toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function isTrustedJobPilotPage() {
+  return (
+    location.hostname === "devastator007.github.io"
+    && location.pathname.toLowerCase().startsWith("/scaleup-jobpilot/")
+  ) || (
+    location.hostname === "scaleuptech.org"
+    && location.pathname.toLowerCase().startsWith("/app/jobpilot")
+  );
+}

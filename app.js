@@ -536,6 +536,7 @@ function renderProfile() {
         <label>Sponsorship required?<select id="answer-sponsorship"><option value="">Choose</option><option value="No" ${answers.sponsorship_required === "No" ? "selected" : ""}>No</option><option value="Yes" ${answers.sponsorship_required === "Yes" ? "selected" : ""}>Yes</option></select></label>
         <label>Notice period<input id="answer-notice" value="${escapeAttr(answers.notice_period || "")}" placeholder="30 days" /></label>
         <label>Salary expectation<input id="answer-salary" value="${escapeAttr(answers.salary_expectation || "")}" placeholder="Optional" /></label>
+        <label>Phone number<input id="answer-phone" value="${escapeAttr(answers.phone || "")}" autocomplete="tel" placeholder="+20…" /></label>
         <label>Years of relevant experience<input id="answer-experience" type="number" min="0" max="60" value="${escapeAttr(answers.years_experience || "")}" /></label>
         <label>Remote preference<input id="answer-remote" value="${escapeAttr(answers.remote_preference || "")}" placeholder="Remote / Hybrid / On-site" /></label>
         <label style="grid-column:1/-1">General application note<textarea id="answer-note" rows="4" placeholder="Reusable facts JobPilot may use when preparing answers.">${escapeHtml(answers.general_note || "")}</textarea></label>
@@ -545,12 +546,18 @@ function renderProfile() {
           <strong>Why CV text is required</strong>
           <p>JobPilot compares job requirements with the candidate CV before preparing applications. PDF/DOCX upload is accepted for record keeping, but paste or upload text for best matching accuracy.</p>
         </div>
-        <button class="button primary" type="submit">Save candidate setup</button>
+        <div class="form-actions" style="grid-column:1/-1">
+          <button class="button primary" type="submit">Save candidate setup</button>
+          <button class="button secondary" type="button" id="sync-browser-assistant">Sync with Browser Assistant</button>
+          <a class="button ghost" href="./jobpilot-browser-assistant.zip" download>Download browser assistant</a>
+        </div>
+        <p id="browser-assistant-message" class="form-message" role="status" aria-live="polite"></p>
       </form>
     </section>
   `;
   document.getElementById("profile-form").addEventListener("submit", saveProfile);
   document.getElementById("profile-cv-file").addEventListener("change", handleCvUpload);
+  document.getElementById("sync-browser-assistant").addEventListener("click", syncBrowserAssistant);
 }
 
 function renderBilling() {
@@ -868,6 +875,7 @@ async function saveProfile(event) {
       sponsorship_required: document.getElementById("answer-sponsorship").value,
       notice_period: document.getElementById("answer-notice").value.trim(),
       salary_expectation: document.getElementById("answer-salary").value.trim(),
+      phone: document.getElementById("answer-phone").value.trim(),
       years_experience: document.getElementById("answer-experience").value.trim(),
       remote_preference: document.getElementById("answer-remote").value.trim(),
       general_note: document.getElementById("answer-note").value.trim()
@@ -887,6 +895,35 @@ async function saveProfile(event) {
   await logEvent("profile_updated", hasResume() ? "Candidate profile and CV matching text updated." : "Candidate profile updated; CV text is still required.");
   renderProfile();
   scheduleAutoSearch();
+}
+
+function syncBrowserAssistant() {
+  const message = document.getElementById("browser-assistant-message");
+  const payload = {
+    version: 1,
+    synced_at: new Date().toISOString(),
+    candidate: {
+      full_name: state.profile?.full_name || "",
+      email: state.profile?.email || state.user?.email || "",
+      target_title: state.profile?.target_title || "",
+      location: state.profile?.location || "",
+      linkedin_url: state.profile?.linkedin_url || "",
+      portfolio_url: state.profile?.portfolio_url || "",
+      resume_summary: state.profile?.resume_summary || ""
+    },
+    answers: state.profile?.application_answers || {}
+  };
+  let bridge = document.getElementById("jobpilot-extension-payload");
+  if (!bridge) {
+    bridge = document.createElement("script");
+    bridge.id = "jobpilot-extension-payload";
+    bridge.type = "application/json";
+    document.body.appendChild(bridge);
+  }
+  bridge.textContent = JSON.stringify(payload).replaceAll("<", "\\u003c");
+  document.dispatchEvent(new CustomEvent("jobpilot-sync-candidate"));
+  message.textContent = "Candidate setup sent to the JobPilot Browser Assistant. If the extension is not installed, download and load it first.";
+  message.classList.add("success");
 }
 
 async function handleCvUpload(event) {

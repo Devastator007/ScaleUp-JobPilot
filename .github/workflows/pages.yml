@@ -29,6 +29,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html styles.css app.js config.js account-links.js account-links.css _site/
+          (cd browser-assistant && zip -qr ../_site/jobpilot-browser-assistant.zip .)
           touch _site/.nojekyll
 
       - name: Setup Pages
@@ -58,12 +59,14 @@ jobs:
             styles_status=$(curl --silent --show-error --location --output /tmp/jobpilot-styles.css --write-out '%{http_code}' "$base_url/styles.css" || true)
             account_script_status=$(curl --silent --show-error --location --output /tmp/jobpilot-account-links.js --write-out '%{http_code}' "$base_url/account-links.js" || true)
             account_styles_status=$(curl --silent --show-error --location --output /tmp/jobpilot-account-links.css --write-out '%{http_code}' "$base_url/account-links.css" || true)
+            assistant_status=$(curl --silent --show-error --location --output /tmp/jobpilot-browser-assistant.zip --write-out '%{http_code}' "$base_url/jobpilot-browser-assistant.zip" || true)
             if [ "$index_status" = "200" ] \
               && [ "$app_status" = "200" ] \
               && [ "$config_status" = "200" ] \
               && [ "$styles_status" = "200" ] \
               && [ "$account_script_status" = "200" ] \
               && [ "$account_styles_status" = "200" ] \
+              && [ "$assistant_status" = "200" ] \
               && grep -q "ScaleUp JobPilot" /tmp/jobpilot.html \
               && grep -q "async function signUp" /tmp/jobpilot-app.js \
               && grep -q "function hasActiveAccess" /tmp/jobpilot-app.js \
@@ -76,7 +79,7 @@ jobs:
               echo "Live verification passed: HTML and all required application assets returned HTTP 200 with expected markers."
               exit 0
             fi
-            echo "Attempt $attempt/12: index=$index_status app=$app_status config=$config_status styles=$styles_status account_script=$account_script_status account_styles=$account_styles_status; waiting for Pages propagation."
+            echo "Attempt $attempt/12: index=$index_status app=$app_status config=$config_status styles=$styles_status account_script=$account_script_status account_styles=$account_styles_status assistant=$assistant_status; waiting for Pages propagation."
             sleep 10
           done
           echo "Live verification failed: one or more required application resources were unavailable or invalid."

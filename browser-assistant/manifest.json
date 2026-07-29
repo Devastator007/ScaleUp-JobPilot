@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ScaleUp JobPilot Browser Assistant",
+  "version": "1.0.0",
+  "description": "Fills visible job application forms from the candidate setup synced from ScaleUp JobPilot.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://*/*"],
+  "action": {
+    "default_title": "JobPilot Assistant",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

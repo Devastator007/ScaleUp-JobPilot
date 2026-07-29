@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>JobPilot Assistant</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <h1>JobPilot Assistant</h1>
+      <p id="sync-status">Checking candidate setup…</p>
+      <button id="fill" type="button">Fill visible questions</button>
+      <button id="submit" class="secondary" type="button">Fill and submit</button>
+      <p class="warning">Submission only runs after this explicit click. CAPTCHA, assessments, consent, file uploads, and unanswered questions stop submission.</p>
+      <pre id="result" aria-live="polite"></pre>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
