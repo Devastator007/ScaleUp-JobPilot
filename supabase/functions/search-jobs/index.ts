@@ -70,7 +70,7 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       saved = data || [];
 
-      if (prefs.application_mode === "auto_prepare" && saved.length) {
+      if (["auto_apply", "auto_prepare"].includes(prefs.application_mode) && saved.length) {
         const applications = saved.map((job) => ({
           user_id: authData.user.id,
           job_id: job.id,

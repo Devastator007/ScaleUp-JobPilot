@@ -5,6 +5,7 @@ const supabaseClient = isConfigured
   : null;
 
 const statusOrder = ["Saved", "Applied", "Interviewing", "Offer", "Rejected"];
+let autoSearchTimer = null;
 const state = {
   user: null,
   profile: null,
@@ -102,6 +103,7 @@ async function refresh() {
   await loadData();
   applyEntitlementState();
   setView(state.view);
+  scheduleAutoSearch();
 }
 
 function showAuth(message) {
@@ -416,7 +418,14 @@ function renderDashboard() {
 }
 
 function renderPipeline() {
+  const scraped = state.jobs.filter((job) => job.source_key).length;
+  const candidateActions = state.jobs.filter((job) => job.action_status === "candidate_action_required").length;
   document.getElementById("pipeline-view").innerHTML = `
+    <div class="metrics-grid">
+      ${metric("Jobs scraped", scraped)}
+      ${metric("Candidate action", candidateActions)}
+      ${metric("Applications submitted", countByStatus("Applied"))}
+    </div>
     <div class="pipeline">
       ${statusOrder
         .map((status) => {
@@ -503,11 +512,24 @@ function renderProfile() {
         <label>Exclude keywords<input id="profile-exclusions" value="${escapeAttr(prefs.exclude_keywords || "")}" placeholder="internship, unpaid" /></label>
         <label>Minimum match %<input id="profile-min-score" type="number" min="0" max="100" value="${Number(prefs.minimum_match_score) || 70}" /></label>
         <label>Jobs per search<input id="profile-daily-limit" type="number" min="1" max="30" value="${Number(prefs.daily_apply_limit) || 10}" /></label>
+        <label>Automatic search
+          <select id="profile-auto-search-interval">
+            ${[
+              ["0", "Off"],
+              ["1", "Every hour"],
+              ["3", "Every 3 hours"],
+              ["6", "Every 6 hours"],
+              ["12", "Every 12 hours"],
+              ["24", "Every 24 hours"]
+            ].map(([value, label]) => `<option value="${value}" ${String(prefs.auto_search_interval_hours || 0) === value ? "selected" : ""}>${label}</option>`).join("")}
+          </select>
+        </label>
         <label style="grid-column:1/-1">Application mode
           <select id="profile-application-mode">
-            <option value="review" ${prefs.application_mode !== "auto_prepare" ? "selected" : ""}>Review every match first</option>
-            <option value="auto_prepare" ${prefs.application_mode === "auto_prepare" ? "selected" : ""}>Prepare answers automatically; I submit on outside portals</option>
+            <option value="review" ${prefs.application_mode === "review" ? "selected" : ""}>Review every match first</option>
+            <option value="auto_apply" ${["auto_apply", "auto_prepare"].includes(prefs.application_mode) ? "selected" : ""}>Auto apply where supported; prepare answers for outside portals</option>
           </select>
+          <span class="muted small">Auto apply never bypasses an outside portal or claims submission without confirmation.</span>
         </label>
         <h3 style="grid-column:1/-1">Reusable application answers</h3>
         <label>Work authorization<input id="answer-authorization" value="${escapeAttr(answers.work_authorization || "")}" placeholder="Authorized to work in…" /></label>
@@ -837,7 +859,9 @@ async function saveProfile(event) {
       exclude_keywords: document.getElementById("profile-exclusions").value.trim(),
       minimum_match_score: Number(document.getElementById("profile-min-score").value) || 70,
       daily_apply_limit: Number(document.getElementById("profile-daily-limit").value) || 10,
-      application_mode: document.getElementById("profile-application-mode").value
+      application_mode: document.getElementById("profile-application-mode").value,
+      auto_search_interval_hours: Number(document.getElementById("profile-auto-search-interval").value) || 0,
+      last_search_at: state.profile?.job_preferences?.last_search_at || null
     },
     application_answers: {
       work_authorization: document.getElementById("answer-authorization").value.trim(),
@@ -862,6 +886,7 @@ async function saveProfile(event) {
   state.profile = data;
   await logEvent("profile_updated", hasResume() ? "Candidate profile and CV matching text updated." : "Candidate profile updated; CV text is still required.");
   renderProfile();
+  scheduleAutoSearch();
 }
 
 async function handleCvUpload(event) {
@@ -897,7 +922,9 @@ function profilePreferences() {
     exclude_keywords: "",
     minimum_match_score: 70,
     daily_apply_limit: 10,
-    application_mode: "review"
+    application_mode: "review",
+    auto_search_interval_hours: 0,
+    last_search_at: null
   };
 }
 
@@ -912,24 +939,55 @@ function candidateSetupReady() {
   );
 }
 
-async function startSearch() {
+async function startSearch(options = {}) {
+  const automatic = options.automatic === true;
   const button = document.getElementById("start-search-btn");
   const result = document.getElementById("search-run-result");
-  button.disabled = true;
-  result.textContent = "Searching supported job feeds and removing duplicates…";
-  result.classList.remove("success");
+  if (button) button.disabled = true;
+  if (result) {
+    result.textContent = automatic
+      ? "Running scheduled search…"
+      : "Searching supported job feeds and removing duplicates…";
+    result.classList.remove("success");
+  }
   const { data, error } = await supabaseClient.functions.invoke("search-jobs", { body: {} });
   if (error) {
-    result.textContent = error.message;
-    button.disabled = false;
+    if (result) result.textContent = error.message;
+    if (button) button.disabled = false;
+    scheduleAutoSearch();
     return;
   }
+  const searchedAt = new Date().toISOString();
+  const jobPreferences = { ...profilePreferences(), last_search_at: searchedAt };
+  const { data: updatedProfile } = await supabaseClient
+    .from("profiles")
+    .update({ job_preferences: jobPreferences })
+    .eq("id", state.user.id)
+    .select("*")
+    .single();
+  if (updatedProfile) state.profile = updatedProfile;
   await logEvent("job_search_run", `Search found ${data.found || 0} jobs and added ${data.added || 0} new opportunities.`);
   await loadData();
   render();
   const next = document.getElementById("search-run-result");
-  next.textContent = `${data.message} Found ${data.found || 0}; added ${data.added || 0} new jobs.`;
-  next.classList.add("success");
+  if (next) {
+    next.textContent = `${data.message} Found ${data.found || 0}; added ${data.added || 0} new jobs.`;
+    next.classList.add("success");
+  }
+  scheduleAutoSearch();
+}
+
+function scheduleAutoSearch() {
+  if (autoSearchTimer) window.clearTimeout(autoSearchTimer);
+  autoSearchTimer = null;
+  if (!state.user || !hasActiveAccess() || !candidateSetupReady()) return;
+  const prefs = profilePreferences();
+  const hours = Number(prefs.auto_search_interval_hours) || 0;
+  if (!hours) return;
+  const intervalMs = hours * 60 * 60 * 1000;
+  const lastRun = Date.parse(prefs.last_search_at || "") || 0;
+  const delay = Math.max(1000, lastRun + intervalMs - Date.now());
+  autoSearchTimer = window.setTimeout(() => startSearch({ automatic: true }), delay);
 }
 
 function titleCase(value) {
