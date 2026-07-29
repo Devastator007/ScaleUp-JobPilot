@@ -90,8 +90,11 @@
               <button class="button primary" type="submit" id="auth-submit-btn">Sign in</button>
               <button class="button secondary" type="button" id="signup-btn">Create account</button>
             </div>
-            <button class="button ghost auth-link" type="button" id="forgot-password-btn">Forgot password?</button>
-            <p id="auth-message" class="form-message"></p>
+            <div class="auth-help-actions">
+              <button class="button ghost auth-link" type="button" id="forgot-password-btn">Forgot password?</button>
+              <button class="button ghost auth-link" type="button" id="resend-confirmation-btn">Resend confirmation email</button>
+            </div>
+            <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
           </form>
         </section>
 

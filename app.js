@@ -31,6 +31,7 @@ const els = {
   authMessage: document.getElementById("auth-message"),
   signupBtn: document.getElementById("signup-btn"),
   forgotPasswordBtn: document.getElementById("forgot-password-btn"),
+  resendConfirmationBtn: document.getElementById("resend-confirmation-btn"),
   signOutBtn: document.getElementById("sign-out-btn"),
   newJobBtn: document.getElementById("new-job-btn"),
   viewTitle: document.getElementById("view-title"),
@@ -84,6 +85,7 @@ function bindEvents() {
     setAuthMode(state.authMode === "signup" ? "signin" : "signup");
   });
   els.forgotPasswordBtn.addEventListener("click", () => setAuthMode("reset"));
+  els.resendConfirmationBtn.addEventListener("click", resendConfirmation);
   document.querySelectorAll("[data-password-toggle]").forEach((button) => {
     button.addEventListener("click", () => togglePasswordVisibility(button));
   });
@@ -141,7 +143,31 @@ async function signUp() {
     return;
   }
   setAuthMode("signin");
-  showAuthMessage("Account created. Please check your email to confirm your account before signing in.", "success");
+  showAuthMessage(
+    "If this address needs confirmation, an email has been requested. Already registered? Sign in or reset your password.",
+    "success"
+  );
+}
+
+async function resendConfirmation() {
+  clearAuthMessage();
+  const email = els.authEmail.value.trim();
+  if (!email) {
+    showAuthMessage("Enter your email address first.", "error");
+    els.authEmail.focus();
+    return;
+  }
+  const { error } = await supabaseClient.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: authRedirectUrl() }
+  });
+  showAuthMessage(
+    error
+      ? error.message
+      : "If this address has an unconfirmed account, a confirmation email has been requested. Check your inbox and spam folder.",
+    error ? "error" : "success"
+  );
 }
 
 async function requestPasswordReset() {
@@ -205,6 +231,7 @@ function setAuthMode(mode, message = "") {
     "Sign in";
   els.signupBtn.textContent = mode === "signup" ? "I already have an account" : "Create account";
   els.forgotPasswordBtn.classList.toggle("hidden", mode === "reset" || mode === "recovery");
+  els.resendConfirmationBtn.classList.toggle("hidden", mode === "reset" || mode === "recovery");
   els.authMessage.textContent = message;
   els.authMessage.classList.remove("success");
 }
