@@ -5,6 +5,8 @@ const supabaseClient = isConfigured
   : null;
 
 const statusOrder = ["Saved", "Applied", "Interviewing", "Offer", "Rejected"];
+const OWNER_EMAIL = "ahmed_hamdy_mahdy@outlook.com";
+const TRIAL_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 let autoSearchTimer = null;
 const state = {
   user: null,
@@ -553,6 +555,18 @@ function renderProfile() {
         </div>
         <p id="browser-assistant-message" class="form-message" role="status" aria-live="polite"></p>
       </form>
+      <aside class="notice-box" aria-labelledby="browser-assistant-notes" style="margin-top:20px">
+        <strong id="browser-assistant-notes">Browser Assistant installation notes</strong>
+        <ol>
+          <li>Save Candidate Setup, including your CV text and reusable answers.</li>
+          <li>Download <strong>JobPilot Browser Assistant</strong> above and extract the ZIP file.</li>
+          <li>Open <code>chrome://extensions</code> or <code>edge://extensions</code>, then enable <strong>Developer mode</strong>.</li>
+          <li>Select <strong>Load unpacked</strong> and choose the extracted extension folder.</li>
+          <li>Return here and click <strong>Sync with Browser Assistant</strong>.</li>
+          <li>Open an external application form, select the JobPilot extension, and choose <strong>Fill visible questions</strong>. Review every answer before submitting.</li>
+        </ol>
+        <p class="muted small">The assistant does not store portal passwords or bypass CAPTCHA, assessments, file uploads, consent, declarations, or unanswered required questions.</p>
+      </aside>
     </section>
   `;
   document.getElementById("profile-form").addEventListener("submit", saveProfile);
@@ -561,6 +575,7 @@ function renderProfile() {
 }
 
 function renderBilling() {
+  const accessUntil = accessExpiresAt();
   document.getElementById("billing-view").innerHTML = `
     <section class="panel">
       <h2>Account access</h2>
@@ -568,11 +583,11 @@ function renderBilling() {
         <tr><th>Account</th><td>${escapeHtml(state.user.email || "")}</td></tr>
         <tr><th>Product</th><td>${escapeHtml(displayPlan())}</td></tr>
         <tr><th>Status</th><td>${escapeHtml(displayStatus())}</td></tr>
-        <tr><th>Access until</th><td>${subscriptionExpiresAt() ? escapeHtml(subscriptionExpiresAt().toLocaleDateString()) : "Not activated"}</td></tr>
+        <tr><th>Access until</th><td>${accessUntil ? escapeHtml(accessUntil.toLocaleString()) : isOwnerAccount() ? "Unlimited owner access" : "Not activated"}</td></tr>
       </table>
       ${hasActiveAccess()
         ? `<div class="notice-box"><strong>Setup status</strong><p>${hasResume() ? "CV is ready for matching." : "Upload or paste CV text before running search."} ${state.searches.length ? "Search setup is ready." : "Create at least one search/apply setup."}</p></div>`
-        : `<div class="notice-box"><strong>Activation required</strong><p>JobPilot access starts after manual InstaPay or bank-transfer verification. Contact ${escapeHtml(cfg.SUPPORT_EMAIL || "support@scaleuptech.org")} with your transfer reference for approval or renewal.</p></div>`}
+        : `<div class="notice-box"><strong>Trial ended</strong><p>Your seven-day JobPilot trial has expired. Contact ${escapeHtml(cfg.SUPPORT_EMAIL || "support@scaleuptech.org")} with your InstaPay or bank-transfer reference to activate or renew your subscription.</p></div>`}
     </section>
     <section class="panel" style="margin-top:16px">
       <h2>Account security</h2>
@@ -721,23 +736,57 @@ function subscriptionExpiresAt() {
   return Number.isNaN(expiresAt.getTime()) ? null : expiresAt;
 }
 
+function trialExpiresAt() {
+  const createdAt = state.profile?.created_at || state.user?.created_at;
+  if (!createdAt) return null;
+  const trialEnd = new Date(new Date(createdAt).getTime() + TRIAL_DURATION_MS);
+  return Number.isNaN(trialEnd.getTime()) ? null : trialEnd;
+}
+
+function isOwnerAccount() {
+  return String(state.user?.email || "").trim().toLowerCase() === OWNER_EMAIL;
+}
+
+function isTrialActive() {
+  const expiresAt = trialExpiresAt();
+  return Boolean(expiresAt && expiresAt.getTime() > Date.now());
+}
+
+function accessExpiresAt() {
+  if (isOwnerAccount()) return null;
+  const subscriptionEnd = subscriptionExpiresAt();
+  if (
+    state.subscription
+    && ["active", "approved"].includes(String(state.subscription.status || "").toLowerCase())
+    && subscriptionEnd?.getTime() > Date.now()
+  ) return subscriptionEnd;
+  return trialExpiresAt();
+}
+
 function hasActiveAccess() {
+  if (isOwnerAccount()) return true;
   if (state.subscription) {
     const expiresAt = subscriptionExpiresAt();
-    return ["active", "approved"].includes(String(state.subscription.status || "").toLowerCase())
+    const paidAccess = ["active", "approved"].includes(String(state.subscription.status || "").toLowerCase())
       && expiresAt
       && expiresAt.getTime() > Date.now();
+    if (paidAccess) return true;
   }
-  return ["active", "approved"].includes(String(state.profile?.license_status || "").toLowerCase());
+  return isTrialActive();
 }
 
 function displayPlan() {
-  return state.subscription?.plan || state.profile?.plan || "trial";
+  if (isOwnerAccount()) return "JobPilot Owner";
+  if (state.subscription && hasActiveAccess()) return state.subscription.plan || "JobPilot Subscription";
+  return "7-day JobPilot trial";
 }
 
 function displayStatus() {
+  if (isOwnerAccount()) return "active";
+  if (state.subscription && hasActiveAccess()) return state.subscription.status || "active";
+  if (isTrialActive()) return "trial";
   if (state.subscription && subscriptionExpiresAt()?.getTime() <= Date.now()) return "expired";
-  return state.subscription?.status || state.profile?.license_status || "trial";
+  return "expired";
 }
 
 function applyEntitlementState() {
