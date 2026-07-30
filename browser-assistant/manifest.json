@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ScaleUp JobPilot Browser Assistant",
-  "version": "1.1.0",
-  "description": "Fills visible job application forms from the candidate setup synced from ScaleUp JobPilot.",
+  "version": "1.2.0",
+  "description": "Captures visible LinkedIn jobs and fills application forms from ScaleUp JobPilot Candidate Setup.",
   "permissions": ["activeTab", "storage"],
   "host_permissions": ["https://*/*"],
   "action": {
