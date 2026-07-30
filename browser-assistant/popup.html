@@ -11,8 +11,13 @@
       <h1>JobPilot Assistant</h1>
       <p id="sync-status">Checking candidate setup…</p>
       <button id="capture-linkedin" type="button">Capture visible LinkedIn jobs</button>
-      <button id="fill" type="button">Fill visible questions</button>
-      <p class="warning">JobPilot fills supported visible fields only. Review every answer and submit the application yourself. CAPTCHA, assessments, consent, declarations, and file uploads always require manual action.</p>
+      <fieldset>
+        <legend>Application mode</legend>
+        <label><input type="radio" name="application-mode" value="review" checked /> Review before submit</label>
+        <label><input type="radio" name="application-mode" value="auto" /> Auto-submit when safe</label>
+      </fieldset>
+      <button id="fill" type="button">Run assistant</button>
+      <p class="warning">Auto-submit only runs after your explicit mode selection and stops for unresolved required questions, CAPTCHA, assessments, consent, declarations, file uploads, or an ambiguous submit control.</p>
       <pre id="result" aria-live="polite"></pre>
     </main>
     <script src="popup.js"></script>
