@@ -42,9 +42,9 @@ test("assistant inspects visible fields and maps common questions", () => {
   assert.match(content, /setNativeValue/);
 });
 
-test("submission is explicit and fail-closed on risky actions", () => {
-  assert.match(popup, /run\(true\)/);
-  assert.match(content, /shouldSubmit && !blockers\.length && !unresolved\.length/);
+test("assistant is review-only and fail-closed on risky actions", () => {
+  assert.doesNotMatch(popup, /run\(true\)|submitButton|submit:\s*true/);
+  assert.match(popup, /submit:\s*false/);
   assert.match(content, /CAPTCHA/);
   assert.match(content, /Assessment/);
   assert.match(content, /Consent or declaration requires review/);
