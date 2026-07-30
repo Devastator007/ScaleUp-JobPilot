@@ -10,6 +10,9 @@ The assistant fills visible job-application fields from the Candidate Setup expl
 4. Enable **Developer mode**.
 5. Choose **Load unpacked** and select the extracted folder.
 6. Open JobPilot → Candidate Setup → **Sync with Browser Assistant**.
+7. Open a supported application form and use the extension button.
+
+After replacing or updating the unpacked extension, click **Reload** on its extension card and refresh the open JobPilot and application tabs before syncing.
 
 ## Capture LinkedIn jobs
 
@@ -18,15 +21,15 @@ The assistant fills visible job-application fields from the Candidate Setup expl
 3. Return to JobPilot. Captured jobs are imported into Jobs and Pipeline, deduplicated by LinkedIn job ID, and marked as outside-portal candidate actions.
 
 The assistant reads only job cards rendered in the active tab after the candidate explicitly clicks Capture. It does not sign in, bypass LinkedIn controls, run unattended scraping, or store LinkedIn credentials.
-7. Open an application form and use the extension button.
 
-After replacing or updating the unpacked extension, click **Reload** on its
-extension card and refresh the open JobPilot and application tabs before syncing.
+## Supported application sites
+
+The extension requests access only to JobPilot, LinkedIn Jobs, Greenhouse, Lever, Workday, SmartRecruiters, Workable, Ashby, and iCIMS pages. It no longer runs on every HTTPS website.
 
 ## Safety
 
 - No job-board password is requested or stored.
-- The assistant fills only visible form controls.
+- The assistant fills only visible supported form controls.
 - Passwords, file inputs, CAPTCHA, assessments, consent, declarations, and unresolved required questions are not automated.
-- **Fill and submit** requires an explicit click and only proceeds when no blocker is detected and a single unambiguous submit button exists.
+- The assistant never clicks the final application-submission button. The candidate must review every answer and submit manually.
 - External portal terms and candidate accuracy obligations still apply.

@@ -3,7 +3,6 @@
 const status = document.getElementById("sync-status");
 const result = document.getElementById("result");
 const fillButton = document.getElementById("fill");
-const submitButton = document.getElementById("submit");
 const captureLinkedInButton = document.getElementById("capture-linkedin");
 
 chrome.storage.local.get("candidateSetup", ({ candidateSetup }) => {
@@ -12,11 +11,9 @@ chrome.storage.local.get("candidateSetup", ({ candidateSetup }) => {
     ? `Synced ${new Date(candidateSetup.synced_at).toLocaleString()}`
     : "Open Candidate Setup in JobPilot and click “Sync with Browser Assistant” first.";
   fillButton.disabled = !ready;
-  submitButton.disabled = !ready;
 });
 
-fillButton.addEventListener("click", () => run(false));
-submitButton.addEventListener("click", () => run(true));
+fillButton.addEventListener("click", fillVisibleQuestions);
 captureLinkedInButton.addEventListener("click", captureLinkedInJobs);
 
 async function captureLinkedInJobs() {
@@ -40,11 +37,11 @@ async function captureLinkedInJobs() {
     });
     result.textContent = `Captured ${response.jobs.length} LinkedIn job${response.jobs.length === 1 ? "" : "s"}. Open JobPilot to import them into Jobs and Pipeline.`;
   } catch {
-    result.textContent = "LinkedIn did not respond. Refresh the LinkedIn page after updating the extension, then retry.";
+    result.textContent = "LinkedIn did not respond. Confirm the extension has access to this LinkedIn Jobs page, refresh it, then retry.";
   }
 }
 
-async function run(submit) {
+async function fillVisibleQuestions() {
   result.textContent = "Inspecting the visible application form…";
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
@@ -54,10 +51,10 @@ async function run(submit) {
   try {
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: "jobpilot:fill",
-      submit
+      submit: false
     });
     result.textContent = response?.message || "No response from this page.";
   } catch {
-    result.textContent = "This page does not allow the assistant. Refresh it after installing the extension.";
+    result.textContent = "This site is not in the supported application-site list. JobPilot did not request access to the page.";
   }
 }
