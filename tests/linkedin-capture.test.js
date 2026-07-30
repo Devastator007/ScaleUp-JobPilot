@@ -22,5 +22,5 @@ test("JobPilot imports captured jobs as deduplicated outside-portal actions", ()
   assert.match(app, /onConflict: "user_id,source_key"/);
   assert.match(app, /action_status: "candidate_action_required"/);
   assert.match(app, /application_route: "outside_portal"/);
-  assert.equal(manifest.version, "1.2.0");
+  assert.equal(manifest.version, "1.3.0");
 });
