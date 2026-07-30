@@ -6,10 +6,86 @@ if (isTrustedJobPilotPage()) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "jobpilot:fill") return false;
-  fillApplication(Boolean(message.submit)).then(sendResponse);
-  return true;
+  if (message?.type === "jobpilot:fill") {
+    fillApplication(Boolean(message.submit)).then(sendResponse);
+    return true;
+  }
+  if (message?.type === "jobpilot:capture-linkedin") {
+    sendResponse(captureLinkedInJobs());
+    return false;
+  }
+  return false;
 });
+
+function captureLinkedInJobs() {
+  if (!/(^|\.)linkedin\.com$/i.test(location.hostname) || !location.pathname.startsWith("/jobs")) {
+    return { jobs: [], message: "Open a LinkedIn Jobs search-results page first." };
+  }
+  const cards = uniqueElements([
+    ...document.querySelectorAll("li[data-occludable-job-id]"),
+    ...document.querySelectorAll("[data-job-id]"),
+    ...document.querySelectorAll(".jobs-search-results__list-item"),
+    ...document.querySelectorAll(".job-card-container")
+  ]);
+  const jobs = cards.map(linkedInJobFromCard).filter(Boolean);
+  const deduplicated = jobs.filter((job, index, list) =>
+    list.findIndex((candidate) => candidate.source_key === job.source_key) === index
+  );
+  return {
+    jobs: deduplicated.slice(0, 50),
+    message: deduplicated.length
+      ? `Captured ${deduplicated.length} visible LinkedIn jobs.`
+      : "No visible LinkedIn jobs were found. Scroll the results list, then retry."
+  };
+}
+
+function linkedInJobFromCard(card) {
+  const link = card.querySelector("a[href*='/jobs/view/']");
+  if (!link) return null;
+  const url = new URL(link.href, location.origin);
+  const id = card.getAttribute("data-occludable-job-id")
+    || card.getAttribute("data-job-id")
+    || url.pathname.match(/\/jobs\/view\/(\d+)/)?.[1];
+  if (!id) return null;
+  url.search = "";
+  url.hash = "";
+  const title = textOf(card, [
+    ".job-card-list__title",
+    ".job-card-container__link",
+    ".artdeco-entity-lockup__title",
+    "a[href*='/jobs/view/'] strong",
+    "a[href*='/jobs/view/']"
+  ]);
+  if (!title) return null;
+  return {
+    title,
+    company: textOf(card, [
+      ".artdeco-entity-lockup__subtitle",
+      ".job-card-container__primary-description",
+      ".job-card-container__company-name"
+    ]),
+    location: textOf(card, [
+      ".job-card-container__metadata-item",
+      ".artdeco-entity-lockup__caption"
+    ]),
+    platform: "LinkedIn",
+    url: url.href,
+    description: textOf(card, [".job-card-container__footer-wrapper", ".job-card-list__insight"]),
+    source_key: `linkedin:${id}`
+  };
+}
+
+function textOf(root, selectors) {
+  for (const selector of selectors) {
+    const value = root.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function uniqueElements(elements) {
+  return [...new Set(elements)];
+}
 
 async function fillApplication(shouldSubmit) {
   const { candidateSetup } = await chrome.storage.local.get("candidateSetup");
@@ -191,6 +267,30 @@ async function syncCandidateSetup() {
   } catch {
     // Invalid bridge data is ignored rather than stored.
   }
+}
+
+async function exposePendingLinkedInJobs() {
+  if (!isTrustedJobPilotPage()) return;
+  const { pendingLinkedInJobs } = await chrome.storage.local.get("pendingLinkedInJobs");
+  if (!pendingLinkedInJobs?.jobs?.length) return;
+  let bridge = document.getElementById("jobpilot-linkedin-import-payload");
+  if (!bridge) {
+    bridge = document.createElement("script");
+    bridge.id = "jobpilot-linkedin-import-payload";
+    bridge.type = "application/json";
+    document.documentElement.appendChild(bridge);
+  }
+  bridge.textContent = JSON.stringify(pendingLinkedInJobs);
+  document.dispatchEvent(new CustomEvent("jobpilot-linkedin-import"));
+}
+
+if (isTrustedJobPilotPage()) {
+  exposePendingLinkedInJobs();
+  document.addEventListener("jobpilot-linkedin-import-request", exposePendingLinkedInJobs);
+  document.addEventListener("jobpilot-linkedin-import-complete", async () => {
+    await chrome.storage.local.remove("pendingLinkedInJobs");
+    document.getElementById("jobpilot-linkedin-import-payload")?.remove();
+  });
 }
 
 function educationAnswer(question, selectedLevel = "", resume = "") {
