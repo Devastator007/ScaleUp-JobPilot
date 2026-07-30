@@ -22,14 +22,21 @@ After replacing or updating the unpacked extension, click **Reload** on its exte
 
 The assistant reads only job cards rendered in the active tab after the candidate explicitly clicks Capture. It does not sign in, bypass LinkedIn controls, run unattended scraping, or store LinkedIn credentials.
 
+## Application modes
+
+- **Review before submit** fills supported visible fields and leaves final submission to the candidate.
+- **Auto-submit when safe** may click one unambiguous final submission control only after the candidate explicitly selects that mode and runs the assistant.
+
+Auto-submit remains fail-closed. It stops when any required question is unresolved or when the page contains CAPTCHA, assessments, consent, declarations, file uploads, or no single unambiguous submission control.
+
 ## Supported application sites
 
-The extension requests access only to JobPilot, LinkedIn Jobs, Greenhouse, Lever, Workday, SmartRecruiters, Workable, Ashby, and iCIMS pages. It no longer runs on every HTTPS website.
+The extension requests access only to JobPilot, LinkedIn Jobs, Greenhouse, Lever, Workday, SmartRecruiters, Workable, Ashby, and iCIMS pages. It does not run on every HTTPS website.
 
 ## Safety
 
 - No job-board password is requested or stored.
 - The assistant fills only visible supported form controls.
 - Passwords, file inputs, CAPTCHA, assessments, consent, declarations, and unresolved required questions are not automated.
-- The assistant never clicks the final application-submission button. The candidate must review every answer and submit manually.
+- Auto-submit requires an explicit candidate mode selection and remains blocked by the safety checks above.
 - External portal terms and candidate accuracy obligations still apply.

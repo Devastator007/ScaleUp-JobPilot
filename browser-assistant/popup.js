@@ -4,14 +4,24 @@ const status = document.getElementById("sync-status");
 const result = document.getElementById("result");
 const fillButton = document.getElementById("fill");
 const captureLinkedInButton = document.getElementById("capture-linkedin");
+const modeInputs = [...document.querySelectorAll("input[name='application-mode']")];
 
-chrome.storage.local.get("candidateSetup", ({ candidateSetup }) => {
+chrome.storage.local.get(["candidateSetup", "applicationMode"], ({ candidateSetup, applicationMode }) => {
   const ready = Boolean(candidateSetup?.candidate?.resume_summary);
   status.textContent = ready
     ? `Synced ${new Date(candidateSetup.synced_at).toLocaleString()}`
     : "Open Candidate Setup in JobPilot and click “Sync with Browser Assistant” first.";
   fillButton.disabled = !ready;
+  const savedMode = applicationMode === "auto" ? "auto" : "review";
+  const savedInput = modeInputs.find((input) => input.value === savedMode);
+  if (savedInput) savedInput.checked = true;
 });
+
+for (const input of modeInputs) {
+  input.addEventListener("change", async () => {
+    if (input.checked) await chrome.storage.local.set({ applicationMode: input.value });
+  });
+}
 
 fillButton.addEventListener("click", fillVisibleQuestions);
 captureLinkedInButton.addEventListener("click", captureLinkedInJobs);
@@ -48,10 +58,12 @@ async function fillVisibleQuestions() {
     result.textContent = "No active application tab found.";
     return;
   }
+  const selectedMode = modeInputs.find((input) => input.checked)?.value || "review";
+  await chrome.storage.local.set({ applicationMode: selectedMode });
   try {
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: "jobpilot:fill",
-      submit: false
+      submit: selectedMode === "auto"
     });
     result.textContent = response?.message || "No response from this page.";
   } catch {

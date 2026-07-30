@@ -11,6 +11,7 @@ const app = read("app.js");
 const manifest = JSON.parse(read("browser-assistant/manifest.json"));
 const content = read("browser-assistant/content.js");
 const popup = read("browser-assistant/popup.js");
+const popupHtml = read("browser-assistant/popup.html");
 const workflow = read(".github/workflows/pages.yml");
 
 test("Candidate Setup can sync a CV-derived answer pack to the extension", () => {
@@ -42,13 +43,16 @@ test("assistant inspects visible fields and maps common questions", () => {
   assert.match(content, /setNativeValue/);
 });
 
-test("assistant is review-only and fail-closed on risky actions", () => {
-  assert.doesNotMatch(popup, /run\(true\)|submitButton|submit:\s*true/);
-  assert.match(popup, /submit:\s*false/);
+test("assistant supports explicit review and fail-closed auto-submit", () => {
+  assert.match(popupHtml, /Review before submit/);
+  assert.match(popupHtml, /Auto-submit when safe/);
+  assert.match(popup, /selectedMode === "auto"/);
+  assert.match(popup, /applicationMode/);
   assert.match(content, /CAPTCHA/);
   assert.match(content, /Assessment/);
   assert.match(content, /Consent or declaration requires review/);
   assert.match(content, /input\[type='file'\]/);
+  assert.match(content, /shouldSubmit && !blockers\.length && !unresolved\.length/);
   assert.doesNotMatch(content, /input\[type=['"]password/);
 });
 
