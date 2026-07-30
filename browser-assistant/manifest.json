@@ -1,17 +1,41 @@
 {
   "manifest_version": 3,
   "name": "ScaleUp JobPilot Browser Assistant",
-  "version": "1.2.0",
-  "description": "Captures visible LinkedIn jobs and fills application forms from ScaleUp JobPilot Candidate Setup.",
+  "version": "1.3.0",
+  "description": "Captures visible LinkedIn jobs and fills supported application forms from ScaleUp JobPilot Candidate Setup for user review.",
   "permissions": ["activeTab", "storage"],
-  "host_permissions": ["https://*/*"],
+  "host_permissions": [
+    "https://devastator007.github.io/ScaleUp-JobPilot/*",
+    "https://scaleuptech.org/app/jobpilot*",
+    "https://*.linkedin.com/jobs/*",
+    "https://*.greenhouse.io/*",
+    "https://*.lever.co/*",
+    "https://*.myworkdayjobs.com/*",
+    "https://*.workdayjobs.com/*",
+    "https://*.smartrecruiters.com/*",
+    "https://*.workable.com/*",
+    "https://*.ashbyhq.com/*",
+    "https://*.icims.com/*"
+  ],
   "action": {
     "default_title": "JobPilot Assistant",
     "default_popup": "popup.html"
   },
   "content_scripts": [
     {
-      "matches": ["https://*/*"],
+      "matches": [
+        "https://devastator007.github.io/ScaleUp-JobPilot/*",
+        "https://scaleuptech.org/app/jobpilot*",
+        "https://*.linkedin.com/jobs/*",
+        "https://*.greenhouse.io/*",
+        "https://*.lever.co/*",
+        "https://*.myworkdayjobs.com/*",
+        "https://*.workdayjobs.com/*",
+        "https://*.smartrecruiters.com/*",
+        "https://*.workable.com/*",
+        "https://*.ashbyhq.com/*",
+        "https://*.icims.com/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
