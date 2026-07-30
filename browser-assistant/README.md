@@ -10,6 +10,14 @@ The assistant fills visible job-application fields from the Candidate Setup expl
 4. Enable **Developer mode**.
 5. Choose **Load unpacked** and select the extracted folder.
 6. Open JobPilot → Candidate Setup → **Sync with Browser Assistant**.
+
+## Capture LinkedIn jobs
+
+1. Open a LinkedIn Jobs search-results page and scroll the result list you want JobPilot to read.
+2. Open JobPilot Assistant and click **Capture visible LinkedIn jobs**.
+3. Return to JobPilot. Captured jobs are imported into Jobs and Pipeline, deduplicated by LinkedIn job ID, and marked as outside-portal candidate actions.
+
+The assistant reads only job cards rendered in the active tab after the candidate explicitly clicks Capture. It does not sign in, bypass LinkedIn controls, run unattended scraping, or store LinkedIn credentials.
 7. Open an application form and use the extension button.
 
 After replacing or updating the unpacked extension, click **Reload** on its
