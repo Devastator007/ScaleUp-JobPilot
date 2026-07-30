@@ -72,6 +72,8 @@ async function init() {
 }
 
 function bindEvents() {
+  document.addEventListener("jobpilot-linkedin-import", importLinkedInJobs);
+  document.dispatchEvent(new CustomEvent("jobpilot-linkedin-import-request"));
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => setView(button.dataset.view));
   });
@@ -567,10 +569,11 @@ function renderProfile() {
           <p>JobPilot compares job requirements with the candidate CV before preparing applications. PDF/DOCX upload is accepted for record keeping, but paste or upload text for best matching accuracy.</p>
         </div>
         <div class="form-actions" style="grid-column:1/-1">
-          <button class="button primary" type="submit">Save candidate setup</button>
+          <button class="button primary" type="submit" id="profile-save-button">Save candidate setup</button>
           <button class="button secondary" type="button" id="sync-browser-assistant">Sync with Browser Assistant</button>
           <a class="button ghost" href="./jobpilot-browser-assistant.zip" download>Download browser assistant</a>
         </div>
+        <p id="profile-save-message" class="form-message" role="status" aria-live="polite"></p>
         <p id="browser-assistant-message" class="form-message" role="status" aria-live="polite"></p>
       </form>
       <aside class="notice-box" aria-labelledby="browser-assistant-notes" style="margin-top:20px">
@@ -919,6 +922,12 @@ async function clearActivity() {
 
 async function saveProfile(event) {
   event.preventDefault();
+  const saveButton = document.getElementById("profile-save-button");
+  const saveMessage = document.getElementById("profile-save-message");
+  saveButton.disabled = true;
+  saveButton.textContent = "Saving…";
+  saveMessage.textContent = "";
+  saveMessage.classList.remove("success");
   const payload = {
     full_name: document.getElementById("profile-name").value.trim(),
     email: document.getElementById("profile-email").value.trim(),
@@ -951,20 +960,27 @@ async function saveProfile(event) {
       general_note: document.getElementById("answer-note").value.trim()
     }
   };
-  const { data, error } = await supabaseClient
-    .from("profiles")
-    .update(payload)
-    .eq("id", state.user.id)
-    .select("*")
-    .single();
-  if (error) {
-    alert(error.message);
-    return;
+  try {
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .update(payload)
+      .eq("id", state.user.id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("Your profile could not be saved. Refresh the page, sign in again, and retry.");
+
+    state.profile = data;
+    await logEvent("profile_updated", hasResume() ? "Candidate profile and CV matching text updated." : "Candidate profile updated; CV text is still required.");
+    saveMessage.textContent = "Candidate setup saved successfully.";
+    saveMessage.classList.add("success");
+    scheduleAutoSearch();
+  } catch (error) {
+    saveMessage.textContent = `Could not save Candidate Setup: ${error.message || "Unknown error"}`;
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = "Save candidate setup";
   }
-  state.profile = data;
-  await logEvent("profile_updated", hasResume() ? "Candidate profile and CV matching text updated." : "Candidate profile updated; CV text is still required.");
-  renderProfile();
-  scheduleAutoSearch();
 }
 
 function syncBrowserAssistant() {
@@ -1095,6 +1111,48 @@ async function startSearch(options = {}) {
     next.classList.add("success");
   }
   scheduleAutoSearch();
+}
+
+async function importLinkedInJobs() {
+  if (!state.user || !hasActiveAccess()) return;
+  const bridge = document.getElementById("jobpilot-linkedin-import-payload");
+  if (!bridge?.textContent) return;
+  try {
+    const payload = JSON.parse(bridge.textContent);
+    const captured = Array.isArray(payload.jobs) ? payload.jobs.slice(0, 50) : [];
+    const rows = captured
+      .filter((job) => job?.source_key && job?.title && /^https:\/\/([a-z]+\.)?linkedin\.com\/jobs\/view\//i.test(job.url || ""))
+      .map((job) => ({
+        user_id: state.user.id,
+        title: String(job.title).slice(0, 300),
+        company: String(job.company || "").slice(0, 300),
+        location: String(job.location || "").slice(0, 300),
+        platform: "LinkedIn",
+        url: String(job.url).slice(0, 2000),
+        description: String(job.description || "").slice(0, 8000),
+        source_key: String(job.source_key).slice(0, 300),
+        status: "Saved",
+        action_status: "candidate_action_required",
+        application_route: "outside_portal",
+        notes: "Captured from the candidate's visible LinkedIn search results. Review and complete the application on LinkedIn."
+      }));
+    if (!rows.length) throw new Error("No valid LinkedIn jobs were supplied by Browser Assistant.");
+
+    const { data, error } = await supabaseClient
+      .from("jobs")
+      .upsert(rows, { onConflict: "user_id,source_key", ignoreDuplicates: true })
+      .select("id");
+    if (error) throw error;
+
+    await logEvent("linkedin_jobs_imported", `Browser Assistant captured ${rows.length} LinkedIn jobs; ${data?.length || 0} were newly added.`);
+    document.dispatchEvent(new CustomEvent("jobpilot-linkedin-import-complete"));
+    await loadData();
+    render();
+    setView("jobs");
+    alert(`LinkedIn capture complete: ${rows.length} found, ${data?.length || 0} newly added.`);
+  } catch (error) {
+    alert(`LinkedIn import failed: ${error.message || "Unknown error"}`);
+  }
 }
 
 function scheduleAutoSearch() {
