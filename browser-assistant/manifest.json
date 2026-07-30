@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ScaleUp JobPilot Browser Assistant",
-  "version": "1.3.0",
-  "description": "Captures visible LinkedIn jobs and fills supported application forms from ScaleUp JobPilot Candidate Setup for user review.",
+  "version": "1.4.0",
+  "description": "Captures visible LinkedIn jobs and fills supported application forms from ScaleUp JobPilot Candidate Setup, with user-controlled review or safe auto-submit modes.",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "https://devastator007.github.io/ScaleUp-JobPilot/*",
