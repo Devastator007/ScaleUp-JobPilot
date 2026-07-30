@@ -17,8 +17,11 @@ test("Candidate Setup can sync a CV-derived answer pack to the extension", () =>
   assert.match(app, /id="sync-browser-assistant"/);
   assert.match(app, /bridge\.id = "jobpilot-extension-payload"/);
   assert.match(app, /jobpilot-sync-candidate/);
+  assert.match(app, /jobpilot-sync-complete/);
+  assert.match(app, /jobpilot-candidate-setup/);
   assert.match(app, /resume_summary/);
   assert.match(content, /chrome\.storage\.local\.set\(\{ candidateSetup \}\)/);
+  assert.match(content, /localStorage\.getItem\("jobpilot-candidate-setup"\)/);
   assert.match(content, /function isTrustedJobPilotPage\(\)/);
   assert.match(content, /location\.hostname === "devastator007\.github\.io"/);
   assert.match(content, /location\.hostname === "scaleuptech\.org"/);
@@ -31,6 +34,11 @@ test("assistant inspects visible fields and maps common questions", () => {
   assert.match(content, /work\.\?authori\[sz\]ation/);
   assert.match(content, /years\?.*\(experience\)/);
   assert.match(content, /cover\.\?letter/);
+  assert.match(content, /educationAnswer/);
+  assert.match(content, /willing_to_commute/);
+  assert.match(content, /willing_to_relocate/);
+  assert.match(content, /type === "radio"/);
+  assert.match(content, /field\.click\(\)/);
   assert.match(content, /setNativeValue/);
 });
 

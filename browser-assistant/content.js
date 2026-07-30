@@ -1,16 +1,8 @@
 "use strict";
 
 if (isTrustedJobPilotPage()) {
-  document.addEventListener("jobpilot-sync-candidate", () => {
-    const bridge = document.getElementById("jobpilot-extension-payload");
-    if (!bridge?.textContent) return;
-    try {
-      const candidateSetup = JSON.parse(bridge.textContent);
-      chrome.storage.local.set({ candidateSetup });
-    } catch {
-      // Invalid bridge data is ignored rather than stored.
-    }
-  });
+  document.addEventListener("jobpilot-sync-candidate", syncCandidateSetup);
+  syncCandidateSetup();
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -72,7 +64,7 @@ function fieldQuestion(field) {
   const labelledBy = String(field.getAttribute("aria-labelledby") || "")
     .split(/\s+/)
     .map((id) => document.getElementById(id)?.innerText || "");
-  const nearby = field.closest("label, fieldset, [role='group'], .form-group, .field")?.innerText || "";
+  const nearby = field.closest("label, fieldset, [role='group'], .form-group, .field, .fb-dash-form-element, .jobs-easy-apply-form-section__grouping")?.innerText || "";
   return [
     ...labels,
     ...labelledBy,
@@ -102,6 +94,9 @@ function resolveAnswer(question, field, setup) {
     [/notice|available.?to.?start|start.?date/, a.notice_period],
     [/salary|compensation|expected.?pay/, a.salary_expectation],
     [/years?.*(experience)|experience.*years?/, a.years_experience],
+    [/completed.*(education|degree)|level of education|education requirement/, educationAnswer(q, a.education_level, c.resume_summary)],
+    [/commut(e|ing)|travel to.*(job|work|office)/, a.willing_to_commute],
+    [/relocat(e|ion)/, a.willing_to_relocate],
     [/remote|hybrid|on.?site/, a.remote_preference],
     [/cover.?letter|why.*(role|company|join|interested)|additional.?information|summary/, a.general_note || excerpt(c.resume_summary)]
   ];
@@ -115,7 +110,18 @@ function resolveAnswer(question, field, setup) {
 function applyAnswer(field, answer) {
   const tag = field.tagName;
   const type = String(field.type || "").toLowerCase();
-  if (type === "checkbox" || type === "radio") return false;
+  if (type === "checkbox") return false;
+  if (type === "radio") {
+    const optionText = normalize([
+      ...(field.labels ? [...field.labels].map((label) => label.innerText) : []),
+      field.value,
+      field.getAttribute("aria-label")
+    ].filter(Boolean).join(" "));
+    if (!optionText.includes(normalize(answer))) return false;
+    field.click();
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+    return field.checked;
+  }
   if (tag === "SELECT") {
     const option = [...field.options].find((item) => normalize(item.textContent).includes(normalize(answer)));
     if (!option) return false;
@@ -172,6 +178,35 @@ function normalize(value = "") {
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
+}
+
+async function syncCandidateSetup() {
+  const bridge = document.getElementById("jobpilot-extension-payload");
+  const raw = bridge?.textContent || localStorage.getItem("jobpilot-candidate-setup");
+  if (!raw) return;
+  try {
+    const candidateSetup = JSON.parse(raw);
+    await chrome.storage.local.set({ candidateSetup });
+    document.dispatchEvent(new CustomEvent("jobpilot-sync-complete"));
+  } catch {
+    // Invalid bridge data is ignored rather than stored.
+  }
+}
+
+function educationAnswer(question, selectedLevel = "", resume = "") {
+  const levels = [
+    ["high school", 1],
+    ["associate", 2],
+    ["bachelor", 3],
+    ["master", 4],
+    ["doctorate", 5],
+    ["doctoral", 5],
+    ["phd", 5]
+  ];
+  const required = levels.find(([label]) => question.includes(label))?.[1];
+  const candidateText = `${selectedLevel} ${resume}`.toLowerCase();
+  const achieved = levels.reduce((highest, [label, rank]) => candidateText.includes(label) ? Math.max(highest, rank) : highest, 0);
+  return required && achieved ? (achieved >= required ? "Yes" : "No") : null;
 }
 
 function isTrustedJobPilotPage() {

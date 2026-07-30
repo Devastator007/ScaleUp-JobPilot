@@ -12,6 +12,9 @@ The assistant fills visible job-application fields from the Candidate Setup expl
 6. Open JobPilot → Candidate Setup → **Sync with Browser Assistant**.
 7. Open an application form and use the extension button.
 
+After replacing or updating the unpacked extension, click **Reload** on its
+extension card and refresh the open JobPilot and application tabs before syncing.
+
 ## Safety
 
 - No job-board password is requested or stored.

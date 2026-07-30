@@ -551,6 +551,13 @@ function renderProfile() {
         <label>Salary expectation<input id="answer-salary" value="${escapeAttr(answers.salary_expectation || "")}" placeholder="Optional" /></label>
         <label>Phone number<input id="answer-phone" value="${escapeAttr(answers.phone || "")}" autocomplete="tel" placeholder="+20…" /></label>
         <label>Years of relevant experience<input id="answer-experience" type="number" min="0" max="60" value="${escapeAttr(answers.years_experience || "")}" /></label>
+        <label>Highest education
+          <select id="answer-education">
+            ${["", "High school", "Associate", "Bachelor", "Master", "Doctorate"].map((value) => `<option value="${value}" ${answers.education_level === value ? "selected" : ""}>${value || "Choose"}</option>`).join("")}
+          </select>
+        </label>
+        <label>Comfortable commuting?<select id="answer-commute"><option value="">Choose</option><option value="Yes" ${answers.willing_to_commute === "Yes" ? "selected" : ""}>Yes</option><option value="No" ${answers.willing_to_commute === "No" ? "selected" : ""}>No</option></select></label>
+        <label>Willing to relocate?<select id="answer-relocate"><option value="">Choose</option><option value="Yes" ${answers.willing_to_relocate === "Yes" ? "selected" : ""}>Yes</option><option value="No" ${answers.willing_to_relocate === "No" ? "selected" : ""}>No</option></select></label>
         <label>Remote preference<input id="answer-remote" value="${escapeAttr(answers.remote_preference || "")}" placeholder="Remote / Hybrid / On-site" /></label>
         <label style="grid-column:1/-1">General application note<textarea id="answer-note" rows="4" placeholder="Reusable facts JobPilot may use when preparing answers.">${escapeHtml(answers.general_note || "")}</textarea></label>
         <label style="grid-column:1/-1">Upload CV or resume<input id="profile-cv-file" type="file" accept=".txt,.md,.pdf,.doc,.docx" /></label>
@@ -937,6 +944,9 @@ async function saveProfile(event) {
       salary_expectation: document.getElementById("answer-salary").value.trim(),
       phone: document.getElementById("answer-phone").value.trim(),
       years_experience: document.getElementById("answer-experience").value.trim(),
+      education_level: document.getElementById("answer-education").value,
+      willing_to_commute: document.getElementById("answer-commute").value,
+      willing_to_relocate: document.getElementById("answer-relocate").value,
       remote_preference: document.getElementById("answer-remote").value.trim(),
       general_note: document.getElementById("answer-note").value.trim()
     }
@@ -973,6 +983,13 @@ function syncBrowserAssistant() {
     },
     answers: state.profile?.application_answers || {}
   };
+  let acknowledged = false;
+  const acknowledge = () => {
+    acknowledged = true;
+    message.textContent = "Browser Assistant sync confirmed.";
+    message.classList.add("success");
+  };
+  document.addEventListener("jobpilot-sync-complete", acknowledge, { once: true });
   let bridge = document.getElementById("jobpilot-extension-payload");
   if (!bridge) {
     bridge = document.createElement("script");
@@ -981,9 +998,15 @@ function syncBrowserAssistant() {
     document.body.appendChild(bridge);
   }
   bridge.textContent = JSON.stringify(payload).replaceAll("<", "\\u003c");
+  localStorage.setItem("jobpilot-candidate-setup", JSON.stringify(payload));
   document.dispatchEvent(new CustomEvent("jobpilot-sync-candidate"));
-  message.textContent = "Candidate setup sent to the JobPilot Browser Assistant. If the extension is not installed, download and load it first.";
-  message.classList.add("success");
+  message.textContent = "Waiting for Browser Assistant confirmation…";
+  message.classList.remove("success");
+  window.setTimeout(() => {
+    if (acknowledged) return;
+    document.removeEventListener("jobpilot-sync-complete", acknowledge);
+    message.textContent = "Browser Assistant did not confirm sync. Reload this JobPilot page after installing or updating the extension, then click Sync again.";
+  }, 1500);
 }
 
 async function handleCvUpload(event) {
