@@ -24,3 +24,10 @@ test("signed-out users can safely request another confirmation email", () => {
   assert.match(script, /emailRedirectTo:\s*authRedirectUrl\(\)/);
   assert.match(script, /If this address has an unconfirmed account/);
 });
+
+test("auth email failures never render an empty object", () => {
+  assert.match(script, /function authErrorMessage\(error, fallback\)/);
+  assert.match(script, /message === "\{\}"/);
+  assert.match(script, /password-reset email service is unavailable/);
+  assert.match(script, /registration email service is unavailable/);
+});

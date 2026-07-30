@@ -127,7 +127,7 @@ async function signIn() {
     email: els.authEmail.value.trim(),
     password: els.authPassword.value
   });
-  if (error) els.authMessage.textContent = error.message;
+  if (error) showAuthMessage(authErrorMessage(error, "Unable to sign in. Check your email and password."), "error");
 }
 
 async function signUp() {
@@ -139,7 +139,7 @@ async function signUp() {
     options: { emailRedirectTo: authRedirectUrl() }
   });
   if (error) {
-    showAuthMessage(error.message, "error");
+    showAuthMessage(authErrorMessage(error, "Registration could not be completed. Please try again."), "error");
     return;
   }
   const isExistingAccount = Array.isArray(data.user?.identities) && data.user.identities.length === 0;
@@ -167,7 +167,7 @@ async function resendConfirmation() {
   });
   showAuthMessage(
     error
-      ? error.message
+      ? authErrorMessage(error, "The registration email service is unavailable. Contact support@scaleuptech.org.")
       : "If this address has an unconfirmed account, a confirmation email has been requested. Check your inbox and spam folder.",
     error ? "error" : "success"
   );
@@ -184,7 +184,9 @@ async function requestPasswordReset() {
     redirectTo: authRedirectUrl()
   });
   showAuthMessage(
-    error ? error.message : "Password reset email sent. Please check your inbox.",
+    error
+      ? authErrorMessage(error, "The password-reset email service is unavailable. Contact support@scaleuptech.org.")
+      : "Password reset email sent. Please check your inbox and spam folder.",
     error ? "error" : "success"
   );
 }
@@ -196,7 +198,7 @@ async function updatePassword() {
     password: els.authPassword.value
   });
   if (error) {
-    showAuthMessage(error.message, "error");
+    showAuthMessage(authErrorMessage(error, "Password update failed. Please request a new reset link."), "error");
     return;
   }
   await supabaseClient.auth.signOut();
@@ -215,6 +217,12 @@ function clearAuthMessage() {
 function showAuthMessage(message, type = "error") {
   els.authMessage.textContent = message || "";
   els.authMessage.classList.toggle("success", type === "success");
+}
+
+function authErrorMessage(error, fallback) {
+  const message = typeof error?.message === "string" ? error.message.trim() : "";
+  if (!message || message === "{}" || message === "[object Object]") return fallback;
+  return message;
 }
 
 function setAuthMode(mode, message = "") {
