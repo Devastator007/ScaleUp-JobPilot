@@ -27,9 +27,11 @@ jobs:
       - name: Prepare static site
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p _site
           cp index.html styles.css app.js config.js account-links.js account-links.css _site/
           (cd browser-assistant && zip -qr ../_site/jobpilot-browser-assistant.zip .)
+          printf '{"commit":"%s","built_at":"%s"}\n' "$GITHUB_SHA" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > _site/version.json
           touch _site/.nojekyll
 
       - name: Setup Pages
@@ -48,9 +50,11 @@ jobs:
         shell: bash
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           test -n "$PAGE_URL"
+          test -n "$EXPECTED_COMMIT"
           base_url="${PAGE_URL%/}"
           for attempt in {1..12}; do
             index_status=$(curl --silent --show-error --location --output /tmp/jobpilot.html --write-out '%{http_code}' "$PAGE_URL" || true)
@@ -60,6 +64,8 @@ jobs:
             account_script_status=$(curl --silent --show-error --location --output /tmp/jobpilot-account-links.js --write-out '%{http_code}' "$base_url/account-links.js" || true)
             account_styles_status=$(curl --silent --show-error --location --output /tmp/jobpilot-account-links.css --write-out '%{http_code}' "$base_url/account-links.css" || true)
             assistant_status=$(curl --silent --show-error --location --output /tmp/jobpilot-browser-assistant.zip --write-out '%{http_code}' "$base_url/jobpilot-browser-assistant.zip" || true)
+            version_status=$(curl --silent --show-error --location --output /tmp/jobpilot-version.json --write-out '%{http_code}' "$base_url/version.json" || true)
+            deployed_commit=$(node -e "const fs=require('fs'); try { const v=JSON.parse(fs.readFileSync('/tmp/jobpilot-version.json','utf8')); process.stdout.write(typeof v.commit==='string' ? v.commit : ''); } catch { process.stdout.write(''); }" || true)
             if [ "$index_status" = "200" ] \
               && [ "$app_status" = "200" ] \
               && [ "$config_status" = "200" ] \
@@ -67,6 +73,8 @@ jobs:
               && [ "$account_script_status" = "200" ] \
               && [ "$account_styles_status" = "200" ] \
               && [ "$assistant_status" = "200" ] \
+              && [ "$version_status" = "200" ] \
+              && [ "$deployed_commit" = "$EXPECTED_COMMIT" ] \
               && grep -q "ScaleUp JobPilot" /tmp/jobpilot.html \
               && grep -q "async function signUp" /tmp/jobpilot-app.js \
               && grep -q "function hasActiveAccess" /tmp/jobpilot-app.js \
@@ -76,11 +84,11 @@ jobs:
               && grep -q "linkIdentity" /tmp/jobpilot-account-links.js \
               && grep -q "client.auth.resend" /tmp/jobpilot-account-links.js \
               && grep -q "\\.connected-accounts-panel" /tmp/jobpilot-account-links.css; then
-              echo "Live verification passed: HTML and all required application assets returned HTTP 200 with expected markers."
+              echo "Live verification passed: commit $EXPECTED_COMMIT and all required application assets are deployed."
               exit 0
             fi
-            echo "Attempt $attempt/12: index=$index_status app=$app_status config=$config_status styles=$styles_status account_script=$account_script_status account_styles=$account_styles_status assistant=$assistant_status; waiting for Pages propagation."
+            echo "Attempt $attempt/12: index=$index_status app=$app_status config=$config_status styles=$styles_status account_script=$account_script_status account_styles=$account_styles_status assistant=$assistant_status version=$version_status deployed_commit=${deployed_commit:-missing} expected_commit=$EXPECTED_COMMIT; waiting for Pages propagation."
             sleep 10
           done
-          echo "Live verification failed: one or more required application resources were unavailable or invalid."
+          echo "Live verification failed: the expected commit or one or more required application resources were unavailable or invalid."
           exit 1
