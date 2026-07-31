@@ -36,12 +36,17 @@ test("Pages deployment safeguards remain enabled", () => {
 
 test("Pages deployment performs a fail-closed live verification", () => {
   assert.match(pages, /PAGE_URL:\s*\$\{\{ steps\.deployment\.outputs\.page_url \}\}/);
-  assert.equal((pages.match(/curl --silent --show-error --location/g) || []).length, 7);
+  assert.match(pages, /EXPECTED_COMMIT:\s*\$\{\{ github\.sha \}\}/);
+  assert.match(pages, /version\.json/);
+  assert.match(pages, /"commit":"%s"/);
+  assert.equal((pages.match(/curl --silent --show-error --location/g) || []).length, 8);
   assert.match(pages, /index_status" = "200"/);
   assert.match(pages, /app_status" = "200"/);
   assert.match(pages, /config_status" = "200"/);
   assert.match(pages, /styles_status" = "200"/);
   assert.match(pages, /assistant_status" = "200"/);
+  assert.match(pages, /version_status" = "200"/);
+  assert.match(pages, /deployed_commit" = "\$EXPECTED_COMMIT"/);
   assert.match(pages, /grep -q "ScaleUp JobPilot"/);
   assert.match(pages, /grep -q "async function signUp"/);
   assert.match(pages, /grep -q "function hasActiveAccess"/);
